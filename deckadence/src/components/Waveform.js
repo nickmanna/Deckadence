@@ -23,25 +23,83 @@ const Waveform = ({
   const [dragStartX, setDragStartX] = useState(0);
   const [dragStartTime, setDragStartTime] = useState(0);
   const [lastDragTime, setLastDragTime] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [lastCurrentTime, setLastCurrentTime] = useState(0);
   
-  // Performance optimization: cache waveform data
+  // Performance optimization: cache waveform data and rendering
   const [waveformCache, setWaveformCache] = useState(null);
   const [lastRenderTime, setLastRenderTime] = useState(0);
+  const [renderCache, setRenderCache] = useState({ traditional: null, dj: null });
+  const [lastCacheKey, setLastCacheKey] = useState('');
 
-  // Memoize waveform data processing
+  // Memoize waveform data processing with caching
   const processedWaveformData = useMemo(() => {
     if (!track?.waveformData) return null;
     
     const { times, amplitudes, frequency_bands } = track.waveformData;
     
-    // Process data based on waveform mode
+    // Create cache key for this data
+    const cacheKey = `${waveformMode}-${times.length}-${amplitudes.length}`;
+    if (waveformCache && waveformCache.key === cacheKey) {
+      return waveformCache.data;
+    }
+    
+    // Process data based on waveform mode with downsampling for performance
+    // Downsample data based on zoom level and view mode for better performance
+    let downsamplingFactor = 1;
+    if (viewMode === 'dj') {
+      if (isScrolling) {
+        // Aggressive downsampling during scrolling for maximum performance
+        downsamplingFactor = Math.max(1, Math.floor(times.length / 1000));
+      } else if (Math.abs(currentTime - lastCurrentTime) > 0.01) {
+        // Moderate downsampling during playback for smooth rendering
+        downsamplingFactor = Math.max(1, Math.floor(times.length / 1500));
+      } else {
+        downsamplingFactor = zoomLevel >= 4 ? 1 : Math.max(1, Math.floor(times.length / 2000)); // More points for high zoom
+      }
+    } else {
+      if (Math.abs(currentTime - lastCurrentTime) > 0.01) {
+        // Aggressive downsampling during playback for traditional view to prevent lag
+        downsamplingFactor = Math.max(1, Math.floor(times.length / 800));
+      } else {
+        downsamplingFactor = Math.max(1, Math.floor(times.length / 1000)); // Fewer points for traditional view
+      }
+    }
+    
+    // Downsample the data
+    const downsampledTimes = [];
+    const downsampledAmplitudes = [];
+    const downsampledFrequencyBands = frequency_bands ? {
+      low: [],
+      mid: [],
+      high: []
+    } : null;
+    
+    for (let i = 0; i < times.length; i += downsamplingFactor) {
+      downsampledTimes.push(times[i]);
+      downsampledAmplitudes.push(amplitudes[i]);
+      
+      if (downsampledFrequencyBands) {
+        downsampledFrequencyBands.low.push(frequency_bands.low[i] || 0);
+        downsampledFrequencyBands.mid.push(frequency_bands.mid[i] || 0);
+        downsampledFrequencyBands.high.push(frequency_bands.high[i] || 0);
+      }
+    }
+    
+    // Use downsampled data
+    const processedTimes = downsampledTimes;
+    const processedAmplitudes = downsampledAmplitudes;
+    const processedFrequencyBands = downsampledFrequencyBands;
+    
+    // Cache the processed data
+    let processedData;
     switch (waveformMode) {
       case 'blue':
         // Classic blue waveform - use different shades of blue based on amplitude
-        return {
-          times,
-          amplitudes,
-          colors: amplitudes.map(amp => {
+        processedData = {
+          times: processedTimes,
+          amplitudes: processedAmplitudes,
+          colors: processedAmplitudes.map(amp => {
             // Create different shades of blue based on amplitude
             const intensity = Math.min(1, amp * 2); // Scale amplitude for better color variation
             const baseBlue = 0.5 + (intensity * 0.5); // 0.5 to 1.0
@@ -50,16 +108,17 @@ const Waveform = ({
             return [red, green, baseBlue];
           })
         };
+        break;
       
       case 'rgb':
         // RGB based on frequency content with enhanced color mapping
         const colors = [];
-        for (let i = 0; i < times.length; i++) {
-          const low = frequency_bands?.low?.[i] || 0;
-          const mid = frequency_bands?.mid?.[i] || 0;
-          const high = frequency_bands?.high?.[i] || 0;
+        for (let i = 0; i < processedTimes.length; i++) {
+          const low = processedFrequencyBands?.low?.[i] || 0;
+          const mid = processedFrequencyBands?.mid?.[i] || 0;
+          const high = processedFrequencyBands?.high?.[i] || 0;
           const total = low + mid + high;
-          const amplitude = amplitudes[i];
+          const amplitude = processedAmplitudes[i];
           
           if (total === 0 || amplitude < 0.01) {
             colors.push([0.3, 0.3, 0.3]); // Dark gray for silence
@@ -94,16 +153,17 @@ const Waveform = ({
             }
           }
         }
-        return { times, amplitudes, colors };
+        processedData = { times: processedTimes, amplitudes: processedAmplitudes, colors };
+        break;
       
       case '3band': 
       default:
         // 3-band frequency separation (DJ style)
         // Ensure we have valid frequency band data
-        const validFrequencyBands = frequency_bands || {
-          low: amplitudes.map(() => 0),
-          mid: amplitudes.map(() => 0),
-          high: amplitudes.map(() => 0)
+        const validFrequencyBands = processedFrequencyBands || {
+          low: processedAmplitudes.map(() => 0),
+          mid: processedAmplitudes.map(() => 0),
+          high: processedAmplitudes.map(() => 0)
         };
         
         // If frequency bands are all zeros, use amplitude data as fallback
@@ -113,24 +173,29 @@ const Waveform = ({
         
         if (!hasValidBands) {
           // Use amplitude data to create pseudo frequency bands
-          return {
-            times,
-            amplitudes,
+          processedData = {
+            times: processedTimes,
+            amplitudes: processedAmplitudes,
             frequency_bands: {
-              low: amplitudes.map(amp => amp * 0.8),    // Bass (Blue)
-              mid: amplitudes.map(amp => amp * 0.6),    // Midrange (Yellow/Amber)
-              high: amplitudes.map(amp => amp * 0.4)  // Treble (White)
+              low: processedAmplitudes.map(amp => amp * 0.8),    // Bass (Blue)
+              mid: processedAmplitudes.map(amp => amp * 0.6),    // Midrange (Yellow/Amber)
+              high: processedAmplitudes.map(amp => amp * 0.4)  // Treble (White)
             }
           };
+        } else {
+          processedData = {
+            times: processedTimes,
+            amplitudes: processedAmplitudes,
+            frequency_bands: validFrequencyBands
+          };
         }
-        
-        return {
-          times,
-          amplitudes,
-          frequency_bands: validFrequencyBands
-        };
+        break;
     }
-  }, [track?.waveformData, waveformMode]);
+    
+    // Cache the processed data
+    setWaveformCache({ key: cacheKey, data: processedData });
+    return processedData;
+  }, [track?.waveformData, waveformMode, waveformCache, viewMode, zoomLevel, isScrolling, currentTime, lastCurrentTime]);
 
   // Optimized drawing functions with better performance
   const drawTraditionalWaveform = useCallback(() => {
@@ -139,6 +204,14 @@ const Waveform = ({
 
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
+    
+    // Create cache key for this render
+    const cacheKey = `traditional-${waveformMode}-${currentTime.toFixed(2)}-${duration.toFixed(2)}-${showWaveform}-${showBeatgrid}`;
+    
+    // Check if we can use cached render
+    if (renderCache.traditional && lastCacheKey === cacheKey) {
+      return;
+    }
     
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -150,130 +223,168 @@ const Waveform = ({
       ctx.lineCap = 'round';
       
       if (waveformMode === '3band' && frequency_bands) {
-        // Draw 3band waveform (DJ style)
+        // Draw 3band waveform (DJ style) - optimized for performance
         const bandHeight = height / 3;
+        
+        // Pre-calculate all positions to reduce calculations
+        const positions = [];
+        for (let i = 0; i < times.length; i++) {
+          positions.push({
+            x: (times[i] / duration) * width,
+            low: frequency_bands.low[i] || 0,
+            mid: frequency_bands.mid[i] || 0,
+            high: frequency_bands.high[i] || 0,
+            time: times[i]
+          });
+        }
+        
+        // Draw in batches for better performance
+        const batchSize = 100;
         
         // Low frequencies (blue) - bottom third
         ctx.strokeStyle = '#00AEEF';
-        for (let i = 0; i < times.length - 1; i++) {
-          const x1 = (times[i] / duration) * width;
-          const x2 = (times[i + 1] / duration) * width;
-          const y1 = height - (frequency_bands.low[i] * bandHeight);
-          const y2 = height - (frequency_bands.low[i + 1] * bandHeight);
-          
-          if (times[i] < currentTime) {
-            ctx.globalAlpha = 0.3;
-          } else {
-            ctx.globalAlpha = 1.0;
-          }
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        for (let batch = 0; batch < positions.length - 1; batch += batchSize) {
+          const endIndex = Math.min(batch + batchSize, positions.length - 1);
           
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          for (let i = batch; i < endIndex; i++) {
+            const pos = positions[i];
+            const nextPos = positions[i + 1];
+            
+            if (pos.time < currentTime) {
+              ctx.globalAlpha = 0.3;
+            } else {
+              ctx.globalAlpha = 1.0;
+            }
+            
+            const y1 = height - (pos.low * bandHeight);
+            const y2 = height - (nextPos.low * bandHeight);
+            
+            if (i === batch) {
+              ctx.moveTo(pos.x, y1);
+            }
+            ctx.lineTo(nextPos.x, y2);
+          }
           ctx.stroke();
         }
         
         // Mid frequencies (yellow) - middle third
         ctx.strokeStyle = '#FFAA00';
-        for (let i = 0; i < times.length - 1; i++) {
-          const x1 = (times[i] / duration) * width;
-          const x2 = (times[i + 1] / duration) * width;
-          const y1 = height - bandHeight - (frequency_bands.mid[i] * bandHeight);
-          const y2 = height - bandHeight - (frequency_bands.mid[i + 1] * bandHeight);
-          
-          if (times[i] < currentTime) {
-            ctx.globalAlpha = 0.3;
-          } else {
-            ctx.globalAlpha = 1.0;
-          }
+        
+        for (let batch = 0; batch < positions.length - 1; batch += batchSize) {
+          const endIndex = Math.min(batch + batchSize, positions.length - 1);
           
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          for (let i = batch; i < endIndex; i++) {
+            const pos = positions[i];
+            const nextPos = positions[i + 1];
+            
+            if (pos.time < currentTime) {
+              ctx.globalAlpha = 0.3;
+            } else {
+              ctx.globalAlpha = 1.0;
+            }
+            
+            const y1 = height - bandHeight - (pos.mid * bandHeight);
+            const y2 = height - bandHeight - (nextPos.mid * bandHeight);
+            
+            if (i === batch) {
+              ctx.moveTo(pos.x, y1);
+            }
+            ctx.lineTo(nextPos.x, y2);
+          }
           ctx.stroke();
         }
         
         // High frequencies (white) - top third
         ctx.strokeStyle = '#FFFFFF';
-        for (let i = 0; i < times.length - 1; i++) {
-          const x1 = (times[i] / duration) * width;
-          const x2 = (times[i + 1] / duration) * width;
-          const y1 = height - (2 * bandHeight) - (frequency_bands.high[i] * bandHeight);
-          const y2 = height - (2 * bandHeight) - (frequency_bands.high[i + 1] * bandHeight);
-          
-          if (times[i] < currentTime) {
-            ctx.globalAlpha = 0.3;
-          } else {
-            ctx.globalAlpha = 1.0;
-          }
+        
+        for (let batch = 0; batch < positions.length - 1; batch += batchSize) {
+          const endIndex = Math.min(batch + batchSize, positions.length - 1);
           
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          for (let i = batch; i < endIndex; i++) {
+            const pos = positions[i];
+            const nextPos = positions[i + 1];
+            
+            if (pos.time < currentTime) {
+              ctx.globalAlpha = 0.3;
+            } else {
+              ctx.globalAlpha = 1.0;
+            }
+            
+            const y1 = height - (2 * bandHeight) - (pos.high * bandHeight);
+            const y2 = height - (2 * bandHeight) - (nextPos.high * bandHeight);
+            
+            if (i === batch) {
+              ctx.moveTo(pos.x, y1);
+            }
+            ctx.lineTo(nextPos.x, y2);
+          }
           ctx.stroke();
         }
-      } else {    // Draw single-band waveform (blue or RGB) - layered like 3band
-        for (let i = 0; i < times.length - 1; i++) {
-          const x1 = (times[i] / duration) * width;
-          const x2 = (times[i + 1] / duration) * width;
-          const centerY = height / 2;
+      } else {    // Draw single-band waveform (blue or RGB) - optimized for performance
+        // Pre-calculate all positions to reduce calculations in the loop
+        const positions = [];
+        for (let i = 0; i < times.length; i++) {
+          positions.push({
+            x: (times[i] / duration) * width,
+            amp: amplitudes[i],
+            time: times[i],
+            color: colors ? colors[i] : null
+          });
+        }
+        
+        // Draw in batches for better performance
+        const batchSize = 50;
+        for (let batch = 0; batch < positions.length - 1; batch += batchSize) {
+          const endIndex = Math.min(batch + batchSize, positions.length - 1);
           
-          // Dim played sections
-          if (times[i] < currentTime) {
-            ctx.globalAlpha = 0.3;
-          } else {
-            ctx.globalAlpha = 1.0;
-          }
-          
-          if (waveformMode === 'blue') {
-            // Create layered blue effect with different intensities
-            const amp = amplitudes[i];
-            const amp2 = amplitudes[i + 1];
+          for (let i = batch; i < endIndex; i++) {
+            const pos = positions[i];
+            const nextPos = positions[i + 1];
+            const centerY = height / 2;
             
-            // Base layer (darker blue)
-            ctx.fillStyle = '#0066CC';
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.4);
-            ctx.fillRect(x1, centerY - amp * height / 2 * 0.4, x2 - x1, amp * height / 2 * 0.4);
+            // Dim played sections
+            if (pos.time < currentTime) {
+              ctx.globalAlpha = 0.3;
+            } else {
+              ctx.globalAlpha = 1.0;
+            }
             
-            // Middle layer (medium blue)
-            ctx.fillStyle = '#0088FF';
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.7);
-            ctx.fillRect(x1, centerY - amp * height / 2 * 0.7, x2 - x1, amp * height / 2 * 0.7);
-            
-            // Top layer (bright blue)
-            ctx.fillStyle = '#00AEEF';
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2);
-            ctx.fillRect(x1, centerY - amp * height / 2, x2 - x1, amp * height / 2);
-          } else if (waveformMode === 'rgb' && colors && colors[i]) {
-            // Create layered RGB effect
-            const color = colors[i];
-            const amp = amplitudes[i];
-            const amp2 = amplitudes[i + 1];
-            
-            // Base layer (darker version of the color)
-            const darkColor = [
-              color[0] * 0.4,
-              color[1] * 0.4,
-              color[2] * 0.4
-            ];
-            ctx.fillStyle = `rgb(${darkColor[0] * 255}, ${darkColor[1] * 255}, ${darkColor[2] * 255})`;
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.4);
-            ctx.fillRect(x1, centerY - amp * height / 2 * 0.4, x2 - x1, amp * height / 2 * 0.4);
-            
-            // Middle layer (medium version of the color)
-            const mediumColor = [
-              color[0] * 0.7,
-              color[1] * 0.7,
-              color[2] * 0.7
-            ];
-            ctx.fillStyle = `rgb(${mediumColor[0] * 255}, ${mediumColor[1] * 255}, ${mediumColor[2] * 255})`;
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.7);
-            ctx.fillRect(x1, centerY - amp * height / 2 * 0.7, x2 - x1, amp * height / 2 * 0.7);
-            
-            // Top layer (full color)
-            ctx.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
-            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2);
-            ctx.fillRect(x1, centerY - amp * height / 2, x2 - x1, amp * height / 2);
+            if (waveformMode === 'blue') {
+              // Optimized blue waveform - single layer for performance
+              ctx.fillStyle = '#00AEEF';
+              const height1 = pos.amp * height / 2;
+              const height2 = nextPos.amp * height / 2;
+              
+              // Draw as a single filled path for better performance
+              ctx.beginPath();
+              ctx.moveTo(pos.x, centerY - height1);
+              ctx.lineTo(nextPos.x, centerY - height2);
+              ctx.lineTo(nextPos.x, centerY + height2);
+              ctx.lineTo(pos.x, centerY + height1);
+              ctx.closePath();
+              ctx.fill();
+            } else if (waveformMode === 'rgb' && pos.color) {
+              // Optimized RGB waveform - single layer for performance
+              const color = pos.color;
+              ctx.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
+              const height1 = pos.amp * height / 2;
+              const height2 = nextPos.amp * height / 2;
+              
+              // Draw as a single filled path for better performance
+              ctx.beginPath();
+              ctx.moveTo(pos.x, centerY - height1);
+              ctx.lineTo(nextPos.x, centerY - height2);
+              ctx.lineTo(nextPos.x, centerY + height2);
+              ctx.lineTo(pos.x, centerY + height1);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
         }
       }
@@ -288,7 +399,11 @@ const Waveform = ({
     ctx.moveTo(playheadX, 0);
     ctx.lineTo(playheadX, height);
     ctx.stroke();
-  }, [processedWaveformData, currentTime, duration, showWaveform, waveformMode]);
+    
+    // Cache this render
+    setRenderCache(prev => ({ ...prev, traditional: true }));
+    setLastCacheKey(cacheKey);
+  }, [processedWaveformData, currentTime, duration, showWaveform, waveformMode, showBeatgrid, renderCache, lastCacheKey]);
 
   // DJ View rendering function
   const drawDJWaveform = useCallback(() => {
@@ -297,6 +412,17 @@ const Waveform = ({
 
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
+    
+    // Create cache key for this render
+    const cacheKey = `dj-${waveformMode}-${currentTime.toFixed(2)}-${duration.toFixed(2)}-${zoomLevel}-${showWaveform}-${showBeatgrid}`;
+    
+    // During scrolling, skip cache checks for immediate response
+    if (!isScrolling) {
+      // Check if we can use cached render
+      if (renderCache.dj && lastCacheKey === cacheKey) {
+        return;
+      }
+    }
     
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -387,7 +513,7 @@ const Waveform = ({
       }
     }
     
-    // Draw beatgrid
+    // Draw beatgrid (keep during scrolling but optimize)
     if (track?.beatgrid && showBeatgrid) {
       const beatgrid = track.beatgrid;
       const visibleDuration = duration / zoomLevel;
@@ -451,7 +577,11 @@ const Waveform = ({
     ctx.moveTo(width / 2, 0);
     ctx.lineTo(width / 2, height);
     ctx.stroke();
-  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, showBeatgrid]);
+    
+    // Cache this render
+    setRenderCache(prev => ({ ...prev, dj: true }));
+    setLastCacheKey(cacheKey);
+  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, showBeatgrid, showWaveform, renderCache, lastCacheKey]);
 
   // DJ View drag handlers with jog wheel functionality
   const handleDJMouseDown = (e) => {
@@ -476,12 +606,13 @@ const Waveform = ({
     
     const deltaX = e.clientX - dragStartX;
     const visibleDuration = duration / zoomLevel;
-    const deltaTime = (deltaX / 800) * visibleDuration; // 800 is canvas width
+    const deltaTime = -(deltaX / 800) * visibleDuration; // Negative for correct direction
     const newTime = Math.max(0, Math.min(duration, dragStartTime + deltaTime));
     
-    // Throttle updates for smooth performance
+    // Optimized scrolling: update immediately for responsive feel
     const now = Date.now();
-    if (now - lastDragTime > 16) { // 60fps
+    if (now - lastDragTime > 8) { // 120fps for ultra-smooth scrolling
+      setIsScrolling(true);
       onSeekToTime(newTime);
       setLastDragTime(now);
     }
@@ -490,6 +621,7 @@ const Waveform = ({
   const handleDJMouseUp = () => {
     if (isDragging) {
       setIsDragging(false);
+      setIsScrolling(false);
       
       // Notify parent about jog end
       if (onJogEnd) {
@@ -523,11 +655,40 @@ const Waveform = ({
     }
   }, [isDragging, dragStartX, dragStartTime, duration, zoomLevel, onSeekToTime]);
 
-  // Performance optimization: reduce throttling for smoother rendering
+  // Performance optimization: smart throttling and data downsampling
   useEffect(() => {
     const now = Date.now();
-    // Increase throttling to reduce lag - only render every 50ms (20fps)
-    if (now - lastRenderTime > 50) { // 50ms ~20fps for better performance
+    const timeSinceLastRender = now - lastRenderTime;
+    
+    // Check if track is playing (currentTime is changing)
+    const isPlaying = Math.abs(currentTime - lastCurrentTime) > 0.01;
+    setLastCurrentTime(currentTime);
+    
+    // Adaptive throttling based on zoom level and view mode
+    let throttleTime = 50; // Default 20fps
+    
+    if (viewMode === 'dj') {
+      if (isScrolling) {
+        // Ultra-fast rendering during scrolling for immediate response
+        throttleTime = 8; // 120fps during scrolling
+      } else if (isPlaying) {
+        // Smooth playback rendering
+        throttleTime = 16; // 60fps during playback for smooth movement
+      } else {
+        // DJ view needs more frequent updates for smooth scrolling
+        throttleTime = zoomLevel >= 4 ? 33 : 50; // 30fps for high zoom, 20fps for low zoom
+      }
+    } else {
+      if (isPlaying) {
+        // Reduced frequency for traditional view to prevent lag
+        throttleTime = 33; // 30fps during playback (reduced from 60fps)
+      } else {
+        // Traditional view can be less frequent
+        throttleTime = 100; // 10fps for traditional view (reduced from 15fps)
+      }
+    }
+    
+    if (timeSinceLastRender > throttleTime) {
       if (viewMode === 'traditional') {
         drawTraditionalWaveform();
       } else if (viewMode === 'dj') {
@@ -535,7 +696,7 @@ const Waveform = ({
       }
       setLastRenderTime(now);
     }
-  }, [drawTraditionalWaveform, drawDJWaveform, viewMode, lastRenderTime]);
+  }, [drawTraditionalWaveform, drawDJWaveform, viewMode, lastRenderTime, zoomLevel, isScrolling, currentTime]);
 
   // Re-render when waveform mode changes
   useEffect(() => {
