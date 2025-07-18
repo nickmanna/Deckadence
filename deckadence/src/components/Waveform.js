@@ -406,15 +406,18 @@ const Waveform = ({
   }, [processedWaveformData, currentTime, duration, showWaveform, waveformMode, showBeatgrid, renderCache, lastCacheKey]);
 
   // DJ View rendering function
-  const drawDJWaveform = useCallback(() => {
+  const drawDJWaveform = useCallback((customTime) => {
     const canvas = djCanvasRef.current;
     if (!canvas || !processedWaveformData) return;
 
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
     
+    // Use customTime if provided, otherwise currentTime
+    const timeForRender = typeof customTime === 'number' ? customTime : currentTime;
+
     // Create cache key for this render
-    const cacheKey = `dj-${waveformMode}-${currentTime.toFixed(2)}-${duration.toFixed(2)}-${zoomLevel}-${showWaveform}-${showBeatgrid}`;
+    const cacheKey = `dj-${waveformMode}-${timeForRender.toFixed(2)}-${duration.toFixed(2)}-${zoomLevel}-${showWaveform}-${showBeatgrid}`;
     
     // During scrolling, skip cache checks for immediate response
     if (!isScrolling) {
@@ -436,8 +439,8 @@ const Waveform = ({
     
     // Calculate visible range based on current time and zoom
     const visibleDuration = duration / zoomLevel;
-    const visibleStart = Math.max(0, renderTime - visibleDuration / 2);
-    const visibleEnd = Math.min(duration, renderTime + visibleDuration / 2);
+    const visibleStart = Math.max(0, timeForRender - visibleDuration / 2);
+    const visibleEnd = Math.min(duration, timeForRender + visibleDuration / 2);
     
     if (waveformMode === '3band' && frequency_bands) {
       // Draw 3-band layered waveform (Rekordbox style) - mirrored
@@ -446,15 +449,15 @@ const Waveform = ({
         if (time < visibleStart || time > visibleEnd) continue;
         
         // Calculate x position relative to center (waveform scrolls, playhead stays fixed)
-        const x1 = width / 2 + ((time - renderTime) / visibleDuration) * width;
-        const x2 = width / 2 + ((times[i + 1] - renderTime) / visibleDuration) * width;
+        const x1 = width / 2 + ((time - timeForRender) / visibleDuration) * width;
+        const x2 = width / 2 + ((times[i + 1] - timeForRender) / visibleDuration) * width;
         
         const lowAmp = frequency_bands.low[i] || 0;
         const midAmp = frequency_bands.mid[i] || 0;
         const highAmp = frequency_bands.high[i] || 0;
         
         // Dim played sections
-        if (time < currentTime) {
+        if (time < timeForRender) {
           ctx.globalAlpha = 0.3;
         } else {
           ctx.globalAlpha = 1.0;
@@ -482,8 +485,8 @@ const Waveform = ({
         if (time < visibleStart || time > visibleEnd) continue;
         
         // Calculate x position relative to center (waveform scrolls, playhead stays fixed)
-        const x1 = width / 2 + ((time - currentTime) / visibleDuration) * width;
-        const x2 = width / 2 + ((times[i + 1] - currentTime) / visibleDuration) * width;
+        const x1 = width / 2 + ((time - timeForRender) / visibleDuration) * width;
+        const x2 = width / 2 + ((times[i + 1] - timeForRender) / visibleDuration) * width;
         const y1 = centerY - (amplitudes[i] * height / 2);
         const y2 = centerY - (amplitudes[i + 1] * height / 2);
         
@@ -496,7 +499,7 @@ const Waveform = ({
         }
         
         // Dim played sections
-        if (time < renderTime) {
+        if (time < timeForRender) {
           ctx.globalAlpha = 0.3;
         } else {
           ctx.globalAlpha = 1.0;
@@ -517,15 +520,15 @@ const Waveform = ({
     if (track?.beatgrid && showBeatgrid) {
       const beatgrid = track.beatgrid;
       const visibleDuration = duration / zoomLevel;
-      const visibleStart = Math.max(0, currentTime - visibleDuration / 2);
-      const visibleEnd = Math.min(duration, currentTime + visibleDuration / 2);
+      const visibleStart = Math.max(0, timeForRender - visibleDuration / 2);
+      const visibleEnd = Math.min(duration, timeForRender + visibleDuration / 2);
       
       // Find beats in visible range
       const visibleBeats = beatgrid.filter(beat => beat >= visibleStart && beat <= visibleEnd);
       
       visibleBeats.forEach((beat) => {
         // Calculate x position relative to center (same as waveform)
-        const x = width / 2 + ((beat - renderTime) / visibleDuration) * width;
+        const x = width / 2 + ((beat - timeForRender) / visibleDuration) * width;
         
         // Check if this is a 4-beat marker (every 4th beat)
         // Find the beat index in the full beatgrid
@@ -581,7 +584,7 @@ const Waveform = ({
     // Cache this render
     setRenderCache(prev => ({ ...prev, dj: true }));
     setLastCacheKey(cacheKey);
-  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, showBeatgrid, showWaveform, renderCache, lastCacheKey]);
+  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, showBeatgrid, showWaveform, renderCache, lastCacheKey, djCanvasRef]);
 
   // DJ View drag handlers with jog wheel functionality
   const handleDJMouseDown = (e) => {
@@ -720,7 +723,7 @@ const Waveform = ({
 
   const lastCurrentTimeRef = useRef(currentTime);
   const lastWallClockRef = useRef(performance.now());
-  const [interpolatedTime, setInterpolatedTime] = useState(currentTime);
+  const interpolatedTimeRef = useRef(currentTime);
 
   // Update refs when currentTime changes
   useEffect(() => {
@@ -730,24 +733,22 @@ const Waveform = ({
 
   // Animation loop for smooth DJ view
   useEffect(() => {
-    if (viewMode !== 'dj') {
-      setInterpolatedTime(currentTime);
-      return;
-    }
+    if (viewMode !== 'dj') return;
     let running = true;
     function animate() {
       if (!running) return;
       const now = performance.now();
       const elapsed = (now - lastWallClockRef.current) / 1000;
-      setInterpolatedTime(lastCurrentTimeRef.current + elapsed);
+      interpolatedTimeRef.current = lastCurrentTimeRef.current + elapsed;
+      drawDJWaveform(interpolatedTimeRef.current); // pass the interpolated time directly
       requestAnimationFrame(animate);
     }
     requestAnimationFrame(animate);
     return () => { running = false; };
-  }, [viewMode, currentTime]);
+  }, [viewMode, currentTime, drawDJWaveform]);
 
   // Use interpolatedTime for DJ view, currentTime for traditional
-  const renderTime = viewMode === 'dj' ? interpolatedTime : currentTime;
+  const renderTime = viewMode === 'dj' ? interpolatedTimeRef.current : currentTime;
 
   return (
     <div className="waveform-component">
