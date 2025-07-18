@@ -417,6 +417,7 @@ const TrackPlayer = ({ track, onClose }) => {
             onJogStart={handleJogStart}
             onJogEnd={handleJogEnd}
             isJogging={isJogging}
+            isPlaying={isPlaying}
           />
 
           {/* Playback Controls */}

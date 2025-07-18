@@ -13,7 +13,8 @@ const Waveform = ({
   onSeekToTime,
   onJogStart,
   onJogEnd,
-  waveformMode = '3band'
+  waveformMode = '3band',
+  isPlaying = false
 }) => {
   const canvasRef = useRef(null);
   const djCanvasRef = useRef(null);
@@ -738,14 +739,21 @@ const Waveform = ({
     function animate() {
       if (!running) return;
       const now = performance.now();
-      const elapsed = (now - lastWallClockRef.current) / 1000;
-      interpolatedTimeRef.current = lastCurrentTimeRef.current + elapsed;
-      drawDJWaveform(interpolatedTimeRef.current); // pass the interpolated time directly
+      let timeToDraw;
+      if (isPlaying) {
+        const elapsed = (now - lastWallClockRef.current) / 1000;
+        interpolatedTimeRef.current = lastCurrentTimeRef.current + elapsed;
+        timeToDraw = interpolatedTimeRef.current;
+      } else {
+        interpolatedTimeRef.current = lastCurrentTimeRef.current;
+        timeToDraw = interpolatedTimeRef.current;
+      }
+      drawDJWaveform(timeToDraw);
       requestAnimationFrame(animate);
     }
     requestAnimationFrame(animate);
     return () => { running = false; };
-  }, [viewMode, currentTime, drawDJWaveform]);
+  }, [viewMode, currentTime, isPlaying, drawDJWaveform]);
 
   // Use interpolatedTime for DJ view, currentTime for traditional
   const renderTime = viewMode === 'dj' ? interpolatedTimeRef.current : currentTime;
