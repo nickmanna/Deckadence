@@ -755,6 +755,14 @@ const Waveform = ({
     return () => { running = false; };
   }, [viewMode, currentTime, isPlaying, drawDJWaveform]);
 
+  useEffect(() => {
+    if (viewMode === 'dj') {
+      interpolatedTimeRef.current = currentTime;
+      lastCurrentTimeRef.current = currentTime;
+      lastWallClockRef.current = performance.now();
+    }
+  }, [isPlaying, currentTime, viewMode]);
+
   // Use interpolatedTime for DJ view, currentTime for traditional
   const renderTime = viewMode === 'dj' ? interpolatedTimeRef.current : currentTime;
 
