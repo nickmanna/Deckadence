@@ -37,41 +37,60 @@ const Waveform = ({
     // Process data based on waveform mode
     switch (waveformMode) {
       case 'blue':
-        // Classic blue waveform - use overall amplitude
+        // Classic blue waveform - use different shades of blue based on amplitude
         return {
           times,
           amplitudes,
-          colors: amplitudes.map(() => [0.5, 0.5, 1.0]) // Proper blue color
+          colors: amplitudes.map(amp => {
+            // Create different shades of blue based on amplitude
+            const intensity = Math.min(1, amp * 2); // Scale amplitude for better color variation
+            const baseBlue = 0.5 + (intensity * 0.5); // 0.5 to 1.0
+            const green = 0.3 + (intensity * 0.4); // 0.3 to 0.7 for cyan-blue shades
+            const red = 0.1 + (intensity * 0.2); // 0.1 to 0.3 for slight warmth
+            return [red, green, baseBlue];
+          })
         };
       
       case 'rgb':
-        // RGB based on frequency content (spectral centroid approximation)
+        // RGB based on frequency content with enhanced color mapping
         const colors = [];
         for (let i = 0; i < times.length; i++) {
           const low = frequency_bands?.low?.[i] || 0;
           const mid = frequency_bands?.mid?.[i] || 0;
           const high = frequency_bands?.high?.[i] || 0;
           const total = low + mid + high;
-          if (total === 0) {
-            colors.push([0.5, 0.5, 0.5]); // Gray for silence
+          const amplitude = amplitudes[i];
+          
+          if (total === 0 || amplitude < 0.01) {
+            colors.push([0.3, 0.3, 0.3]); // Dark gray for silence
           } else {
-            // Enhanced RGB mapping with better color distribution
-            const r = Math.min(1, Math.max(0, low / total * 3));
-            const g = Math.min(1, Math.max(0, mid / total * 3));
-            const b = Math.min(1, Math.max(0, high / total * 3));
-            // Ensure at least one color channel is prominent
-            const maxVal = Math.max(r, g, b);
-            if (maxVal < 0.3) {
-              // Boost the dominant frequency
+            // Enhanced RGB mapping with amplitude-based intensity
+            const intensity = Math.min(1, amplitude * 1.5); // Scale for better visibility
+            
+            // Calculate base RGB values from frequency content
+            const r = Math.min(1, Math.max(0, (low / total) * 2.5));
+            const g = Math.min(1, Math.max(0, (mid / total) * 2.5));
+            const b = Math.min(1, Math.max(0, (high / total) * 2.5));
+            
+            // Apply intensity scaling and ensure minimum brightness
+            const minBrightness = 0.2;
+            const scaledR = Math.max(minBrightness, r * intensity);
+            const scaledG = Math.max(minBrightness, g * intensity);
+            const scaledB = Math.max(minBrightness, b * intensity);
+            
+            // Ensure at least one color channel is prominent for better visibility
+            const maxVal = Math.max(scaledR, scaledG, scaledB);
+            if (maxVal < 0.4) {
+              // Boost the dominant frequency with more vibrant colors
               if (low > mid && low > high) {
-                colors.push([0.8, 0.2, 0.2]); // Red for bass
+                colors.push([0.9, 0.1, 0.1]); // Bright red for bass
               } else if (mid > high) {
-                colors.push([0.2, 0.8, 0.2]); // Green for mids
+                colors.push([0.1, 0.9, 0.1]); // Bright green for mids
               } else {
-                colors.push([0.2, 0.2, 0.8]); // Blue for highs
+                colors.push([0.1, 0.1, 0.9]); // Bright blue for highs
               }
             } else {
-              colors.push([r, g, b]);
+              colors.push([scaledR, scaledG, scaledB]);
             }
           }
         }
@@ -193,20 +212,11 @@ const Waveform = ({
           ctx.lineTo(x2, y2);
           ctx.stroke();
         }
-      } else {    // Draw single-band waveform (blue or RGB)
+      } else {    // Draw single-band waveform (blue or RGB) - layered like 3band
         for (let i = 0; i < times.length - 1; i++) {
           const x1 = (times[i] / duration) * width;
           const x2 = (times[i + 1] / duration) * width;
-          const y1 = (1 - amplitudes[i]) * height;
-          const y2 = (1 - amplitudes[i + 1]) * height;
-          
-          // Color based on mode
-          if (colors && colors[i]) {
-            const color = colors[i];
-            ctx.strokeStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
-          } else {
-            ctx.strokeStyle = '#00AEEF'; // Default blue
-          }
+          const centerY = height / 2;
           
           // Dim played sections
           if (times[i] < currentTime) {
@@ -215,10 +225,56 @@ const Waveform = ({
             ctx.globalAlpha = 1.0;
           }
           
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
+          if (waveformMode === 'blue') {
+            // Create layered blue effect with different intensities
+            const amp = amplitudes[i];
+            const amp2 = amplitudes[i + 1];
+            
+            // Base layer (darker blue)
+            ctx.fillStyle = '#0066CC';
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.4);
+            ctx.fillRect(x1, centerY - amp * height / 2 * 0.4, x2 - x1, amp * height / 2 * 0.4);
+            
+            // Middle layer (medium blue)
+            ctx.fillStyle = '#0088FF';
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.7);
+            ctx.fillRect(x1, centerY - amp * height / 2 * 0.7, x2 - x1, amp * height / 2 * 0.7);
+            
+            // Top layer (bright blue)
+            ctx.fillStyle = '#00AEEF';
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2);
+            ctx.fillRect(x1, centerY - amp * height / 2, x2 - x1, amp * height / 2);
+          } else if (waveformMode === 'rgb' && colors && colors[i]) {
+            // Create layered RGB effect
+            const color = colors[i];
+            const amp = amplitudes[i];
+            const amp2 = amplitudes[i + 1];
+            
+            // Base layer (darker version of the color)
+            const darkColor = [
+              color[0] * 0.4,
+              color[1] * 0.4,
+              color[2] * 0.4
+            ];
+            ctx.fillStyle = `rgb(${darkColor[0] * 255}, ${darkColor[1] * 255}, ${darkColor[2] * 255})`;
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.4);
+            ctx.fillRect(x1, centerY - amp * height / 2 * 0.4, x2 - x1, amp * height / 2 * 0.4);
+            
+            // Middle layer (medium version of the color)
+            const mediumColor = [
+              color[0] * 0.7,
+              color[1] * 0.7,
+              color[2] * 0.7
+            ];
+            ctx.fillStyle = `rgb(${mediumColor[0] * 255}, ${mediumColor[1] * 255}, ${mediumColor[2] * 255})`;
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2 * 0.7);
+            ctx.fillRect(x1, centerY - amp * height / 2 * 0.7, x2 - x1, amp * height / 2 * 0.7);
+            
+            // Top layer (full color)
+            ctx.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
+            ctx.fillRect(x1, centerY, x2 - x1, amp * height / 2);
+            ctx.fillRect(x1, centerY - amp * height / 2, x2 - x1, amp * height / 2);
+          }
         }
       }
     }
