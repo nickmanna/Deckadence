@@ -1,0 +1,128 @@
+/* Rekordbox Deck Styles */
+.rekordbox-deck {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1E1E1E;
+  color: #FFFFFF;
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+}
+
+/* Track Info Panel */
+.track-info-panel {
+  padding: 12px 16px;
+  background: #2A2A2A;
+  border-bottom: 1px solid #404040;
+  flex-shrink: 0;
+}
+
+.track-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 14px;
+  color: #CCCCCC;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.track-bpm {
+  font-size: 14px;
+  font-weight: 600;
+  color: #00AEEF;
+  font-family: 'Courier New', monospace;
+}
+
+.track-key {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFAA00;
+}
+
+.track-time {
+  font-size: 12px;
+  color: #999999;
+  font-family: 'Courier New', monospace;
+}
+
+/* Waveform Overview */
+.waveform-overview {
+  padding: 8px 16px;
+  background: #1E1E1E;
+  border-bottom: 1px solid #404040;
+  flex-shrink: 0;
+}
+
+.overview-canvas {
+  width: 100%;
+  height: 40px;
+  background: #1E1E1E;
+  border: 1px solid #404040;
+  border-radius: 2px;
+}
+
+/* Main Waveform */
+.main-waveform {
+  flex: 1;
+  padding: 8px 16px;
+  background: #1E1E1E;
+  display: flex;
+  align-items: center;
+}
+
+.main-canvas {
+  width: 100%;
+  height: 120px;
+  background: #1E1E1E;
+  border: 1px solid #404040;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.main-canvas:hover {
+  border-color: #00AEEF;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .track-meta {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  
+  .track-title {
+    font-size: 14px;
+  }
+  
+  .track-artist {
+    font-size: 12px;
+  }
+  
+  .track-bpm, .track-key, .track-time {
+    font-size: 12px;
+  }
+  
+  .main-canvas {
+    height: 80px;
+  }
+  
+  .overview-canvas {
+    height: 30px;
+  }
+} 

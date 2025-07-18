@@ -1,0 +1,770 @@
+/* Rekordbox App Styles */
+.rekordbox-app {
+  background: #1E1E1E;
+  color: #ffffff;
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Game Header */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #2A2A2A;
+  border-bottom: 1px solid #404040;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.header-left h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #00AEEF;
+  margin: 0 0 8px 0;
+}
+
+.challenge-info {
+  display: flex;
+  gap: 16px;
+}
+
+.info-item {
+  font-size: 14px;
+  color: #CCCCCC;
+  background: #404040;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.game-timer, .game-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timer-label, .score-label {
+  font-size: 12px;
+  color: #999999;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.timer-value, .score-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #00AEEF;
+}
+
+.back-btn {
+  background: #404040;
+  border: 1px solid #666666;
+  color: #CCCCCC;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #505050;
+  color: #FFFFFF;
+}
+
+/* Loading Screen */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #404040;
+  border-top: 4px solid #00AEEF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 24px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-screen h2 {
+  font-size: 24px;
+  color: #FFFFFF;
+  margin: 0 0 12px 0;
+}
+
+.loading-screen p {
+  font-size: 16px;
+  color: #CCCCCC;
+  margin: 0;
+}
+
+/* Game Start Screen */
+.game-start-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 48px;
+}
+
+.start-content {
+  background: #2A2A2A;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 48px;
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+
+.start-content h2 {
+  font-size: 28px;
+  color: #FFFFFF;
+  margin: 0 0 16px 0;
+}
+
+.start-content p {
+  font-size: 18px;
+  color: #CCCCCC;
+  margin: 0 0 32px 0;
+}
+
+.track-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.preview-track {
+  background: #404040;
+  border: 1px solid #666666;
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-number {
+  font-size: 16px;
+  font-weight: 600;
+  color: #00AEEF;
+}
+
+.track-bpm {
+  font-size: 14px;
+  color: #FFFFFF;
+}
+
+.track-key {
+  font-size: 14px;
+  color: #CCCCCC;
+}
+
+.controller-notice {
+  background: #404040;
+  border: 1px solid #666666;
+  border-radius: 6px;
+  padding: 24px;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.notice-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.controller-notice h3 {
+  font-size: 20px;
+  color: #FFFFFF;
+  margin: 0 0 8px 0;
+}
+
+.controller-notice p {
+  font-size: 16px;
+  color: #CCCCCC;
+  margin: 0;
+}
+
+.start-game-btn {
+  background: #00AEEF;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.start-game-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* Main Game Interface */
+.game-interface {
+  display: flex;
+  flex: 1;
+  background: #1E1E1E;
+}
+
+/* Tracks Container */
+.tracks-container {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  padding: 16px;
+}
+
+.track-section {
+  display: flex;
+  flex-direction: column;
+  background: #2A2A2A;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  min-width: 300px;
+  max-width: 350px;
+  flex: 1;
+}
+
+.track-section.master {
+  background: rgba(0, 174, 239, 0.1);
+  border-color: #00AEEF;
+}
+
+/* Track Info Section */
+.track-info-section {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: #404040;
+  border-bottom: 1px solid #666666;
+  gap: 12px;
+}
+
+.album-art {
+  flex-shrink: 0;
+}
+
+.placeholder-art {
+  width: 48px;
+  height: 48px;
+  background: #666666;
+  border: 1px solid #888888;
+  border-radius: 4px;
+}
+
+.track-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 12px;
+  color: #CCCCCC;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tall Waveform */
+.tall-waveform {
+  flex: 1;
+  min-height: 300px;
+  padding: 8px;
+  background: #1E1E1E;
+}
+
+/* Beatpad Section */
+.beatpad-section {
+  background: #2A2A2A;
+  border-top: 1px solid #404040;
+  padding: 12px;
+}
+
+.beatpad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.beatpad-button {
+  background: #404040;
+  border: 1px solid #666666;
+  color: #CCCCCC;
+  padding: 12px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.beatpad-button:hover {
+  background: #505050;
+  color: #FFFFFF;
+  border-color: #00AEEF;
+}
+
+.beatpad-button:active {
+  background: #00AEEF;
+  color: #FFFFFF;
+  transform: scale(0.95);
+}
+
+.beatpad-mode {
+  display: flex;
+  justify-content: center;
+}
+
+.mode-selector {
+  background: #404040;
+  border: 1px solid #666666;
+  color: #CCCCCC;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mode-selector:focus {
+  outline: none;
+  border-color: #00AEEF;
+}
+
+/* Center Mixer Section */
+.center-mixer {
+  display: flex;
+  flex-direction: column;
+  background: #2A2A2A;
+  border-left: 2px solid #666666;
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.mixer-channels {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.mixer-channel {
+  border-bottom: 1px solid #404040;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mixer-channel:last-child {
+  border-bottom: none;
+}
+
+.channel-header {
+  padding: 8px 12px;
+  background: #404040;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.channel-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.channel-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* EQ Knobs - Stacked Vertically */
+.hi-eq-knob, .mid-eq-knob, .low-eq-knob, .filter-knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.knob-label {
+  font-size: 10px;
+  color: #CCCCCC;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Improved Knob Design with Rotation Indicator */
+.knob {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #666666;
+  border-radius: 50%;
+  background: #404040;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.knob::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: #FFFFFF;
+  transform: translate(-50%, -50%) rotate(45deg);
+  transform-origin: center bottom;
+}
+
+.knob::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: #666666;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.knob.blue {
+  border-color: #00AEEF;
+  background: #00AEEF;
+}
+
+.knob:hover {
+  border-color: #00AEEF;
+  transform: scale(1.05);
+}
+
+/* Channel Fader */
+.channel-fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fader-track {
+  width: 12px;
+  height: 120px;
+  background: linear-gradient(to bottom, #404040, #666666);
+  border: 1px solid #666666;
+  border-radius: 6px;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.fader-track.horizontal {
+  width: 120px;
+  height: 12px;
+}
+
+.fader-handle {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(145deg, #00AEEF, #0098D1);
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.fader-track.horizontal .fader-handle {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.fader-handle:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.fader-track.horizontal .fader-handle:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Master Section */
+.master-section {
+  border-top: 2px solid #666666;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.master-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crossfader {
+  display: flex;
+  justify-content: center;
+}
+
+.headphone-controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.hp-knob, .cue-mix-knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.master-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.master-meter {
+  width: 12px;
+  height: 80px;
+  background: #404040;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.meter-bar {
+  width: 100%;
+  background: linear-gradient(to top, #00AEEF, #FF4444);
+  position: absolute;
+  bottom: 0;
+  transition: height 0.3s ease;
+}
+
+.meter-bar.stereo {
+  background: linear-gradient(to top, #00AEEF, #FF4444);
+}
+
+
+
+/* Results Screen */
+.results-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px;
+}
+
+.score-display {
+  background: #2A2A2A;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 48px;
+  text-align: center;
+}
+
+.score-display h2 {
+  font-size: 24px;
+  color: #FFFFFF;
+  margin: 0 0 16px 0;
+}
+
+.score-number {
+  font-size: 64px;
+  font-weight: 700;
+  color: #00AEEF;
+  margin-bottom: 32px;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #404040;
+}
+
+.score-item:last-child {
+  border-bottom: none;
+}
+
+.score-item span:first-child {
+  color: #CCCCCC;
+}
+
+.score-item span:last-child {
+  color: #00AEEF;
+  font-weight: 600;
+}
+
+.challenge-summary {
+  background: #2A2A2A;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 32px;
+}
+
+.challenge-summary h3 {
+  font-size: 20px;
+  color: #FFFFFF;
+  margin: 0 0 24px 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #404040;
+  border-radius: 6px;
+}
+
+.summary-label {
+  color: #CCCCCC;
+}
+
+.summary-value {
+  color: #00AEEF;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .game-interface {
+    flex-direction: column;
+  }
+  
+  .tracks-container {
+    flex-direction: column;
+  }
+  
+  .track-section {
+    max-width: none;
+  }
+  
+  .center-mixer {
+    max-width: none;
+    border-left: none;
+    border-top: 2px solid #666666;
+  }
+  
+  .mixer-channels {
+    flex-direction: row;
+  }
+  
+  .mixer-channel {
+    flex: 1;
+    border-bottom: none;
+    border-right: 1px solid #404040;
+  }
+  
+  .mixer-channel:last-child {
+    border-right: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .game-header {
+    flex-direction: column;
+    gap: 16px;
+    height: auto;
+    padding: 16px;
+  }
+  
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .tracks-container {
+    padding: 8px;
+  }
+  
+  .track-section {
+    min-width: 250px;
+  }
+  
+  .beatpad-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .mixer-channels {
+    flex-direction: column;
+  }
+  
+  .mixer-channel {
+    border-right: none;
+    border-bottom: 1px solid #404040;
+  }
+} 
