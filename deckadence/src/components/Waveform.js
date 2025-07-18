@@ -31,7 +31,7 @@ const Waveform = ({
   const [lastRenderTime, setLastRenderTime] = useState(0);
   const [renderCache, setRenderCache] = useState({ traditional: null, dj: null });
   const [lastCacheKey, setLastCacheKey] = useState('');
-
+  
   // Memoize waveform data processing with caching
   const processedWaveformData = useMemo(() => {
     if (!track?.waveformData) return null;
@@ -436,8 +436,8 @@ const Waveform = ({
     
     // Calculate visible range based on current time and zoom
     const visibleDuration = duration / zoomLevel;
-    const visibleStart = Math.max(0, currentTime - visibleDuration / 2);
-    const visibleEnd = Math.min(duration, currentTime + visibleDuration / 2);
+    const visibleStart = Math.max(0, renderTime - visibleDuration / 2);
+    const visibleEnd = Math.min(duration, renderTime + visibleDuration / 2);
     
     if (waveformMode === '3band' && frequency_bands) {
       // Draw 3-band layered waveform (Rekordbox style) - mirrored
@@ -446,8 +446,8 @@ const Waveform = ({
         if (time < visibleStart || time > visibleEnd) continue;
         
         // Calculate x position relative to center (waveform scrolls, playhead stays fixed)
-        const x1 = width / 2 + ((time - currentTime) / visibleDuration) * width;
-        const x2 = width / 2 + ((times[i + 1] - currentTime) / visibleDuration) * width;
+        const x1 = width / 2 + ((time - renderTime) / visibleDuration) * width;
+        const x2 = width / 2 + ((times[i + 1] - renderTime) / visibleDuration) * width;
         
         const lowAmp = frequency_bands.low[i] || 0;
         const midAmp = frequency_bands.mid[i] || 0;
@@ -496,7 +496,7 @@ const Waveform = ({
         }
         
         // Dim played sections
-        if (time < currentTime) {
+        if (time < renderTime) {
           ctx.globalAlpha = 0.3;
         } else {
           ctx.globalAlpha = 1.0;
@@ -525,7 +525,7 @@ const Waveform = ({
       
       visibleBeats.forEach((beat) => {
         // Calculate x position relative to center (same as waveform)
-        const x = width / 2 + ((beat - currentTime) / visibleDuration) * width;
+        const x = width / 2 + ((beat - renderTime) / visibleDuration) * width;
         
         // Check if this is a 4-beat marker (every 4th beat)
         // Find the beat index in the full beatgrid
@@ -717,6 +717,37 @@ const Waveform = ({
     
     onSeekToTime(newTime);
   };
+
+  const lastCurrentTimeRef = useRef(currentTime);
+  const lastWallClockRef = useRef(performance.now());
+  const [interpolatedTime, setInterpolatedTime] = useState(currentTime);
+
+  // Update refs when currentTime changes
+  useEffect(() => {
+    lastCurrentTimeRef.current = currentTime;
+    lastWallClockRef.current = performance.now();
+  }, [currentTime]);
+
+  // Animation loop for smooth DJ view
+  useEffect(() => {
+    if (viewMode !== 'dj') {
+      setInterpolatedTime(currentTime);
+      return;
+    }
+    let running = true;
+    function animate() {
+      if (!running) return;
+      const now = performance.now();
+      const elapsed = (now - lastWallClockRef.current) / 1000;
+      setInterpolatedTime(lastCurrentTimeRef.current + elapsed);
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+    return () => { running = false; };
+  }, [viewMode, currentTime]);
+
+  // Use interpolatedTime for DJ view, currentTime for traditional
+  const renderTime = viewMode === 'dj' ? interpolatedTime : currentTime;
 
   return (
     <div className="waveform-component">

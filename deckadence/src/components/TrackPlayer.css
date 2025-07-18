@@ -335,7 +335,6 @@
   border-radius: 2px;
   outline: none;
   cursor: pointer;
-  -webkit-appearance: none;
 }
 
 .volume-slider::-webkit-slider-thumb {
