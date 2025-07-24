@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "tracks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uploaderID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "tracks",
+      "fieldPath": "beatgrid",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "tracks",
+      "fieldPath": "waveformData",
+      "indexes": []
+    }
+  ]
+}

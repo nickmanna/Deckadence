@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { TrackService } from '../services/trackService';
 import TrackPlayer from './TrackPlayer';
 import './TrackLibrary.css';
 
@@ -10,6 +12,10 @@ const TrackLibrary = ({ tracks = [], isOpen, onClose }) => {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [selectedTrack, setSelectedTrack] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [userStats, setUserStats] = useState(null);
+  
+  const { currentUser } = useAuth();
 
   // Mock tracks for demonstration
   const mockTracks = [
@@ -67,10 +73,34 @@ const TrackLibrary = ({ tracks = [], isOpen, onClose }) => {
     }
   ];
 
+  // Load tracks from Firestore if user is authenticated
+  const loadTracksFromFirestore = async () => {
+    if (!currentUser) return;
+    
+    setLoading(true);
+    try {
+      const firestoreTracks = await TrackService.getUserTracks(currentUser.uid);
+      setFilteredTracks(firestoreTracks);
+      
+      // Load user stats
+      const stats = await TrackService.getUserStats(currentUser.uid);
+      setUserStats(stats);
+    } catch (error) {
+      console.error('Error loading tracks from Firestore:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Use useMemo to prevent recreation of allTracks on every render
   const allTracks = React.useMemo(() => {
+    if (currentUser && tracks.length === 0) {
+      // Load from Firestore if no tracks provided and user is authenticated
+      loadTracksFromFirestore();
+      return [];
+    }
     return tracks.length > 0 ? tracks : mockTracks;
-  }, [tracks]);
+  }, [tracks, currentUser]);
 
   useEffect(() => {
     let filtered = [...allTracks];
@@ -286,7 +316,7 @@ const TrackLibrary = ({ tracks = [], isOpen, onClose }) => {
             ) : (
               filteredTracks.map(track => (
                 <div
-                  key={track.id}
+                  key={track.trackID}
                   className="track-card"
                   onClick={() => handleTrackClick(track)}
                 >

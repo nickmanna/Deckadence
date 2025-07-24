@@ -35,16 +35,32 @@ const Waveform = ({
   
   // Memoize waveform data processing with caching
   const processedWaveformData = useMemo(() => {
-    if (!track?.waveformData) return null;
+    console.log('=== WAVEFORM DATA DEBUG ===');
+    console.log('Track:', track);
+    console.log('Duration:', duration);
+    console.log('Waveform data:', track?.waveformData);
+    console.log('Track duration:', track?.duration);
+    console.log('Current time:', currentTime);
+    
+    if (!track?.waveformData) {
+      console.log('❌ No waveform data found');
+      return null;
+    }
     
     const { times, amplitudes, frequency_bands } = track.waveformData;
+    console.log('Times:', times?.length, 'Amplitudes:', amplitudes?.length, 'Frequency bands:', frequency_bands);
+    
+    if (!times || !amplitudes || times.length === 0 || amplitudes.length === 0) {
+      console.log('❌ Invalid waveform data structure');
+      return null;
+    }
     
     // Create cache key for this data
     const cacheKey = `${waveformMode}-${times.length}-${amplitudes.length}`;
     if (waveformCache && waveformCache.key === cacheKey) {
       return waveformCache.data;
     }
-    
+
     // Process data based on waveform mode with downsampling for performance
     // Downsample data based on zoom level and view mode for better performance
     let downsamplingFactor = 1;
@@ -202,7 +218,7 @@ const Waveform = ({
   const drawTraditionalWaveform = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !processedWaveformData) return;
-
+    
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
     
@@ -241,6 +257,8 @@ const Waveform = ({
         
         // Draw in batches for better performance
         const batchSize = 100;
+        
+        console.log('Starting to draw low frequencies...');
         
         // Low frequencies (blue) - bottom third
         ctx.strokeStyle = '#00AEEF';
@@ -341,6 +359,9 @@ const Waveform = ({
         
         // Draw in batches for better performance
         const batchSize = 50;
+        
+
+        
         for (let batch = 0; batch < positions.length - 1; batch += batchSize) {
           const endIndex = Math.min(batch + batchSize, positions.length - 1);
           
@@ -359,8 +380,8 @@ const Waveform = ({
             if (waveformMode === 'blue') {
               // Optimized blue waveform - single layer for performance
               ctx.fillStyle = '#00AEEF';
-              const height1 = pos.amp * height / 2;
-              const height2 = nextPos.amp * height / 2;
+              const height1 = Math.max(1, pos.amp * height / 2);
+              const height2 = Math.max(1, nextPos.amp * height / 2);
               
               // Draw as a single filled path for better performance
               ctx.beginPath();
@@ -374,8 +395,8 @@ const Waveform = ({
               // Optimized RGB waveform - single layer for performance
               const color = pos.color;
               ctx.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
-              const height1 = pos.amp * height / 2;
-              const height2 = nextPos.amp * height / 2;
+              const height1 = Math.max(1, pos.amp * height / 2);
+              const height2 = Math.max(1, nextPos.amp * height / 2);
               
               // Draw as a single filled path for better performance
               ctx.beginPath();
@@ -390,6 +411,8 @@ const Waveform = ({
         }
       }
     }
+    
+
     
     // Draw moving playhead
     ctx.globalAlpha = 1.0;
@@ -518,8 +541,9 @@ const Waveform = ({
     }
     
     // Draw beatgrid (keep during scrolling but optimize)
-    if (track?.beatgrid && showBeatgrid) {
-      const beatgrid = track.beatgrid;
+    // Handle both old (beatgrid) and new (beatGrid) structures
+    const beatgrid = track?.beatgrid || track?.beatGrid || [];
+    if (beatgrid.length > 0 && showBeatgrid) {
       const visibleDuration = duration / zoomLevel;
       const visibleStart = Math.max(0, timeForRender - visibleDuration / 2);
       const visibleEnd = Math.min(duration, timeForRender + visibleDuration / 2);
@@ -585,7 +609,7 @@ const Waveform = ({
     // Cache this render
     setRenderCache(prev => ({ ...prev, dj: true }));
     setLastCacheKey(cacheKey);
-  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, showBeatgrid, showWaveform, renderCache, lastCacheKey, djCanvasRef]);
+  }, [processedWaveformData, currentTime, duration, waveformMode, zoomLevel, track?.beatgrid, track?.beatGrid, showBeatgrid, showWaveform, renderCache, lastCacheKey, djCanvasRef]);
 
   // DJ View drag handlers with jog wheel functionality
   const handleDJMouseDown = (e) => {

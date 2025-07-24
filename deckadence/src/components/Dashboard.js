@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { TrackService } from '../services/trackService';
 import TrackSelectionModal from './TrackSelectionModal';
 import BlindBlendGame from './BlindBlendGame';
 import AudioUploader from './AudioUploader';
@@ -15,6 +17,10 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
   const [challengeConfig, setChallengeConfig] = useState(null);
   const [gameState, setGameState] = useState('dashboard'); // dashboard, game
   const [analyzedTracks, setAnalyzedTracks] = useState([]);
+  const [loadingTracks, setLoadingTracks] = useState(false);
+  const [userStats, setUserStats] = useState(null);
+  
+  const { currentUser } = useAuth();
 
   const tabs = [
     { id: 'discover', label: 'Discover', icon: '🎵', restricted: true },
@@ -56,8 +62,34 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
     setShowTrackLibrary(false);
   };
 
+  // Load user tracks from Firestore
+  const loadUserTracks = async () => {
+    if (!currentUser || isGuest) return;
+    
+    setLoadingTracks(true);
+    try {
+      const tracks = await TrackService.getUserTracks(currentUser.uid);
+      setAnalyzedTracks(tracks);
+      
+      // Load user stats
+      const stats = await TrackService.getUserStats(currentUser.uid);
+      setUserStats(stats);
+    } catch (error) {
+      console.error('Error loading tracks:', error);
+    } finally {
+      setLoadingTracks(false);
+    }
+  };
+
+  // Load tracks when user changes or component mounts
+  useEffect(() => {
+    loadUserTracks();
+  }, [currentUser, isGuest]);
+
   const handleTrackAnalyzed = (trackData) => {
-    setAnalyzedTracks(prev => [...prev, { ...trackData, id: Date.now() }]);
+    setAnalyzedTracks(prev => [...prev, trackData]);
+    // Reload tracks to get the latest data
+    loadUserTracks();
   };
 
   const handleShowAuthModal = () => {

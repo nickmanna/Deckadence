@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { TrackService } from '../services/trackService';
 import './AudioUploader.css';
 
 const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
@@ -8,7 +10,9 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, available, unavailable
+  const [savingToCloud, setSavingToCloud] = useState(false);
   const fileInputRef = useRef(null);
+  const { currentUser } = useAuth();
 
   const supportedFormats = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'];
 
@@ -99,14 +103,47 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
         
         const analysisData = await response.json();
         
-        // Add the file object for ID3 tag reading
-        const result = {
-          ...analysisData,
-          file: selectedFile
-        };
+        // Handle new cloud-based response structure
+        let result;
+        if (analysisData.success && analysisData.track) {
+          // New cloud-based structure
+          const track = analysisData.track;
+                      // Convert beatGrid format to expected format (array of time values)
+            const beatgrid = track.beatGrid ? track.beatGrid.map(beat => beat.time / 1000) : []; // Convert milliseconds to seconds
+            
+            result = {
+              fileName: track.title || selectedFile.name,
+              file: selectedFile,
+              fileSize: selectedFile.size,
+              duration: track.duration,
+              bpm: track.bpm,
+              key: track.key,
+              mode: track.key.includes('m') ? 'minor' : 'major', // Extract mode from key
+              camelot: track.camelotKey,
+              beatgrid: beatgrid, // Converted beatGrid
+              waveformData: track.waveformData || {},
+              analysisDate: track.analysisMetadata?.analysisDate || new Date().toISOString(),
+              confidence: track.analysisMetadata?.confidence || {
+                bpm: 0.95,
+                key: 0.85
+              },
+              trackID: track.trackID,
+              uploaderID: track.uploaderID,
+              status: track.status
+            };
+        } else {
+          // Fallback to old structure if needed
+          result = {
+            ...analysisData,
+            file: selectedFile
+          };
+        }
         
+        const fileToUpload = result.file;
+        const { file, ...trackData } = result;
+
         setUploadProgress(100);
-        setAnalysisResult(result);
+        setAnalysisResult(trackData);
         setUploadState('complete');
       } catch (apiError) {
         console.log('Backend API not available, using fallback analysis:', apiError);
@@ -129,7 +166,10 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
           confidence: {
             bpm: 0.94,
             key: 0.86
-          }
+          },
+          trackID: `fallback_${Date.now()}`,
+          uploaderID: 'fallback_user',
+          status: 'ready'
         };
         
         setUploadProgress(100);
@@ -192,10 +232,50 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
     }
   };
 
-  const handleSaveTrack = () => {
-    if (analysisResult && onTrackAnalyzed) {
-      onTrackAnalyzed(analysisResult);
+  const handleSaveTrack = async () => {
+    if (!analysisResult) return;
+    
+    if (!currentUser) {
+      setErrorMessage('You must be logged in to save tracks to your library');
+      return;
+    }
+    
+    setSavingToCloud(true);
+    setErrorMessage('');
+    
+    try {
+      // Upload audio file to Firebase Storage
+      const { storagePath, downloadURL } = await TrackService.uploadFile(
+        selectedFile, 
+        currentUser.uid, 
+        selectedFile.name
+      );
+      
+      // Create clean track data without the File object
+      const cleanTrackData = {
+        ...analysisResult,
+        storagePath,
+        downloadURL,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size
+      };
+      
+      // Remove the File object as it can't be serialized
+      delete cleanTrackData.file;
+      
+      // Save track to Firestore
+      const savedTrack = await TrackService.saveTrack(cleanTrackData, currentUser.uid);
+      
+      if (onTrackAnalyzed) {
+        onTrackAnalyzed(savedTrack);
+      }
+      
       onClose();
+    } catch (error) {
+      console.error('Error saving track:', error);
+      setErrorMessage('Failed to save track to cloud. Please try again.');
+    } finally {
+      setSavingToCloud(false);
     }
   };
 
@@ -315,27 +395,27 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
                 <div className="info-grid">
                   <div className="info-item">
                     <label>Track Name</label>
-                    <span>{analysisResult.fileName}</span>
+                    <span>{analysisResult.fileName || 'Unknown'}</span>
                   </div>
                   <div className="info-item">
                     <label>Duration</label>
-                    <span>{formatDuration(analysisResult.duration)}</span>
+                    <span>{formatDuration(analysisResult.duration || 0)}</span>
                   </div>
                   <div className="info-item">
                     <label>BPM</label>
-                    <span>{analysisResult.bpm}</span>
+                    <span>{analysisResult.bpm || 'Unknown'}</span>
                   </div>
                   <div className="info-item">
                     <label>Key</label>
-                    <span>{analysisResult.key} {analysisResult.mode}</span>
+                    <span>{analysisResult.key || 'Unknown'} {analysisResult.mode || ''}</span>
                   </div>
                   <div className="info-item">
                     <label>Camelot</label>
-                    <span>{analysisResult.camelot}</span>
+                    <span>{analysisResult.camelot || 'Unknown'}</span>
                   </div>
                   <div className="info-item">
                     <label>Beats</label>
-                    <span>{analysisResult.beatgrid.length}</span>
+                    <span>{analysisResult.beatgrid ? analysisResult.beatgrid.length : 0}</span>
                   </div>
                 </div>
 
@@ -347,33 +427,42 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
                       <div className="confidence-bar">
                         <div 
                           className="confidence-fill"
-                          style={{ width: `${analysisResult.confidence.bpm * 100}%` }}
+                          style={{ width: `${(analysisResult.confidence?.bpm || 0.95) * 100}%` }}
                         ></div>
                       </div>
-                      <span>{Math.round(analysisResult.confidence.bpm * 100)}%</span>
+                      <span>{Math.round((analysisResult.confidence?.bpm || 0.95) * 100)}%</span>
                     </div>
                     <div className="confidence-item">
                       <label>Key</label>
                       <div className="confidence-bar">
                         <div 
                           className="confidence-fill"
-                          style={{ width: `${analysisResult.confidence.key * 100}%` }}
+                          style={{ width: `${(analysisResult.confidence?.key || 0.85) * 100}%` }}
                         ></div>
                       </div>
-                      <span>{Math.round(analysisResult.confidence.key * 100)}%</span>
+                      <span>{Math.round((analysisResult.confidence?.key || 0.85) * 100)}%</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="action-buttons">
-                <button className="save-track-btn" onClick={handleSaveTrack}>
-                  Save to Library
+                <button 
+                  className="save-track-btn" 
+                  onClick={handleSaveTrack}
+                  disabled={savingToCloud || !currentUser}
+                >
+                  {savingToCloud ? 'Saving to Cloud...' : 'Save to Library'}
                 </button>
                 <button className="retry-btn" onClick={handleRetry}>
                   Analyze Another Track
                 </button>
               </div>
+              {!currentUser && (
+                <div className="login-notice">
+                  <p>💡 Sign in to save tracks to your cloud library</p>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import Auth from './Auth';
 import Dashboard from './Dashboard';
 import './App.css';
 
-const App = () => {
+const AppContent = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { currentUser, logout } = useAuth();
 
   const handleGetStarted = () => {
     setShowAuth(true);
@@ -18,25 +19,26 @@ const App = () => {
 
   const handleGuestMode = () => {
     setIsGuest(true);
-    setIsAuthenticated(true);
   };
 
   const handleSignIn = () => {
     // Handle successful sign in
     setIsGuest(false);
-    setIsAuthenticated(true);
   };
 
   const handleSignUp = () => {
     // Handle successful sign up
     setIsGuest(false);
-    setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setIsGuest(false);
-    setShowAuth(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setIsGuest(false);
+      setShowAuth(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleShowAuth = () => {
@@ -44,7 +46,7 @@ const App = () => {
   };
 
   // Show Dashboard if authenticated
-  if (isAuthenticated) {
+  if (currentUser || isGuest) {
     return (
       <Dashboard 
         isGuest={isGuest}
@@ -79,6 +81,14 @@ const App = () => {
         </button>
       </div>
     </div>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 

@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Users can read/write their own tracks
+    match /tracks/{trackId} {
+      // For CREATE operations - check the data being created
+      allow create: if request.auth != null && 
+        request.resource.data.uploaderID == request.auth.uid;
+      
+      // For READ/UPDATE/DELETE operations - check existing data
+      allow read, update, delete: if request.auth != null && 
+        resource.data.uploaderID == request.auth.uid;
+    }
+  }
+}

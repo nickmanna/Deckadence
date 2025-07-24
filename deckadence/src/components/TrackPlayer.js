@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Waveform from './Waveform';
+import { TrackService } from '../services/trackService';
 import './TrackPlayer.css';
 
 const TrackPlayer = ({ track, onClose }) => {
@@ -182,22 +183,78 @@ const TrackPlayer = ({ track, onClose }) => {
     let audioUrl = null;
     
     console.log('TrackPlayer received track:', track);
+    console.log('Track keys:', track ? Object.keys(track) : 'No track');
+    console.log('Track waveform data:', track?.waveformData);
+    console.log('Track duration:', track?.duration);
     
-    if (track && track.file) {
-      loadID3Tags(track.file);
-      // Create object URL for audio playback
-      audioUrl = URL.createObjectURL(track.file);
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
+    const loadAudioFile = async () => {
+      try {
+        if (track && track.file) {
+          // If track has a file object (from upload), use it directly
+          loadID3Tags(track.file);
+          audioUrl = URL.createObjectURL(track.file);
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+          }
+        } else if (track && (track.downloadURL || track.storagePath)) {
+          // If track has storage references, use the download URL directly
+          console.log('Using audio file from storage...');
+          console.log('Track storage info:', { downloadURL: track.downloadURL, storagePath: track.storagePath });
+          
+          // Use download URL directly for audio element (avoids CORS issues)
+          if (track.downloadURL) {
+            if (audioRef.current) {
+              audioRef.current.src = track.downloadURL;
+            }
+            console.log('Audio file loaded from download URL');
+          } else {
+            // Fallback to fetching file if no download URL
+            try {
+              const audioFile = await TrackService.getAudioFile(track);
+              console.log('Audio file retrieved:', audioFile);
+              loadID3Tags(audioFile);
+              audioUrl = URL.createObjectURL(audioFile);
+              if (audioRef.current) {
+                audioRef.current.src = audioUrl;
+              }
+              console.log('Audio file loaded from storage');
+            } catch (error) {
+              console.error('Failed to fetch audio file, using download URL directly');
+              if (audioRef.current) {
+                audioRef.current.src = track.downloadURL;
+              }
+            }
+          }
+          
+          // Set duration immediately if track has it
+          if (track.duration) {
+            setDuration(track.duration);
+            console.log('Duration set immediately from track:', track.duration);
+          } else if (track.waveformData?.duration) {
+            // Fallback to waveform data duration
+            setDuration(track.waveformData.duration);
+            console.log('Duration set from waveform data:', track.waveformData.duration);
+          }
+        } else {
+          // Reset ID3 data when no file is available
+          setId3Data(null);
+          setAlbumCover(null);
+          if (audioRef.current) {
+            audioRef.current.src = '';
+          }
+        }
+      } catch (error) {
+        console.error('Error loading audio file:', error);
+        // Reset ID3 data on error
+        setId3Data(null);
+        setAlbumCover(null);
+        if (audioRef.current) {
+          audioRef.current.src = '';
+        }
       }
-    } else {
-      // Reset ID3 data when no file is available
-      setId3Data(null);
-      setAlbumCover(null);
-      if (audioRef.current) {
-        audioRef.current.src = '';
-      }
-    }
+    };
+    
+    loadAudioFile();
     
     // Cleanup function to revoke object URL
     return () => {
@@ -218,7 +275,10 @@ const TrackPlayer = ({ track, onClose }) => {
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      // Use track duration if available, otherwise use audio duration
+      const trackDuration = track?.duration || audio.duration;
+      setDuration(trackDuration);
+      console.log('Duration set:', trackDuration, 'from track:', track?.duration, 'from audio:', audio.duration);
     };
 
     const handleTimeUpdate = () => {
@@ -239,7 +299,7 @@ const TrackPlayer = ({ track, onClose }) => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [track]);
 
   useEffect(() => {
     if (audioRef.current) {
