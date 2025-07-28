@@ -48,6 +48,7 @@ class TrackAnalyzer:
         self.audio_path = Path(audio_path)
         self.sample_rate = 44100
         self.y = None
+        self.y_filtered = None
         self.sr = None
         self.tempo = None
         self.beats = None
@@ -81,6 +82,8 @@ class TrackAnalyzer:
         try:
             print(f"Loading audio file: {self.audio_path}")
             self.y, self.sr = librosa.load(str(self.audio_path), sr=self.sample_rate)
+            b, a = scipy.signal.butter(2, 30, btype='highpass', fs=self.sr)
+            self.y_filtered = scipy.signal.lfilter(b, a, self.y)
             print(f"Audio loaded successfully. Duration: {len(self.y)/self.sr:.2f} seconds")
             return True
         except Exception as e:
@@ -89,255 +92,142 @@ class TrackAnalyzer:
     
     def detect_bpm(self) -> float:
         """
-        Detect BPM using multiple methods for better accuracy.
-        
-        Returns:
-            float: Detected BPM
+        Detect BPM and beat locations using a robust, two-step process.
         """
         print("Detecting BPM...")
         
-        # Method 1: Onset strength with dynamic programming
-        onset_env = librosa.onset.onset_strength(y=self.y, sr=self.sr)
+        # 1. Create a high-quality onset strength envelope
+        # Using the pre-filtered audio is a great choice.
+        onset_env = librosa.onset.onset_strength(
+            y=self.y_filtered, 
+            sr=self.sr, 
+            aggregate=np.mean, 
+            hop_length=512
+        )
+
+        # 2. Estimate tempo from the onset envelope using librosa's dedicated function
+        # This is more reliable than iterating through start_bpm values.
+        # The result is an array, so we take the first element.
+        prior_tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=self.sr, hop_length=512)[0]
         
-        # Try different starting BPMs to find the best match
-        start_bpms = [60, 70, 80, 90, 100, 110, 120, 123, 125, 130, 140, 150, 160, 170, 180]
-        best_tempo = None
-        best_score = -1
+        # 3. Find the beat locations, providing the detected tempo as a strong prior.
+        # Using the 'bpm' argument makes the beat tracker stick closely to the estimated tempo.
+        # We also get the beat frames to use later in the beatgrid.
+        # We ask for 'frames' here, as it's more direct for later processing.
+        tempo, beat_frames = librosa.beat.beat_track(
+            onset_envelope=onset_env,
+            sr=self.sr,
+            hop_length=512,
+            bpm=prior_tempo, # Use the robustly estimated tempo
+            tightness=100,   # Default tightness, can be tuned
+            trim=True,       # Trim weak beats from start/end
+            units='frames'   # Get beat locations as frame indices
+        )
+
+        # Store the detected beats (as timestamps) for the beatgrid
+        self.beats = librosa.frames_to_time(beat_frames, sr=self.sr, hop_length=512)
+
+        # Ensure tempo is a scalar float and round it
+        final_tempo = tempo.item() if hasattr(tempo, 'item') else tempo
+        self.tempo = round(final_tempo, 2)
         
-        for start_bpm in start_bpms:
-            try:
-                tempo, beats = librosa.beat.beat_track(
-                    onset_envelope=onset_env,
-                    sr=self.sr,
-                    hop_length=512,
-                    start_bpm=start_bpm,
-                    units='time'
-                )
-                
-                # Calculate how well the detected beats align with onset strength
-                beat_times = librosa.frames_to_time(beats, sr=self.sr, hop_length=512)
-                onset_times = librosa.times_like(onset_env, sr=self.sr, hop_length=512)
-                
-                # Score based on onset strength at beat times
-                score = 0
-                for beat_time in beat_times:
-                    if beat_time < len(onset_times):
-                        frame_idx = int(beat_time * self.sr / 512)
-                        if frame_idx < len(onset_env):
-                            score += onset_env[frame_idx]
-                
-                if score > best_score:
-                    best_score = score
-                    # Ensure tempo is a scalar value
-                    if hasattr(tempo, 'item'):
-                        best_tempo = tempo.item()
-                    else:
-                        best_tempo = tempo
-                    
-            except Exception as e:
-                print(f"Warning: BPM detection failed for start_bpm={start_bpm}: {e}")
-                continue
-        
-        # Method 2: Autocorrelation for tempo detection
-        if best_tempo is None:
-            print("Falling back to autocorrelation method...")
-            try:
-                tempo_ac, _ = librosa.beat.beat_track(
-                    onset_envelope=onset_env,
-                    sr=self.sr,
-                    hop_length=512,
-                    start_bpm=120.0
-                )
-                # Ensure tempo is a scalar value
-                if hasattr(tempo_ac, 'item'):
-                    best_tempo = tempo_ac.item()
-                else:
-                    best_tempo = tempo_ac
-            except Exception as e:
-                print(f"Fallback method failed: {e}")
-        
-        # Method 3: Use librosa's tempo detection with wider range
-        if best_tempo is None or best_tempo < 60 or best_tempo > 200:
-            print("Using wide-range tempo detection...")
-            tempo_wide, _ = librosa.beat.beat_track(
-                onset_envelope=onset_env,
-                sr=self.sr,
-                hop_length=512,
-                start_bpm=120.0
-            )
-            # Ensure tempo is a scalar value
-            if hasattr(tempo_wide, 'item'):
-                best_tempo = tempo_wide.item()
-            else:
-                best_tempo = tempo_wide
-        
-        # Additional method: Use librosa's tempo detection directly
-        if best_tempo is None:
-            print("Using librosa's direct tempo detection...")
-            best_tempo = librosa.beat.tempo(
-                onset_envelope=onset_env,
-                sr=self.sr,
-                hop_length=512
-            )[0]
-        
-        # Ensure best_tempo is a scalar value (not numpy array)
-        if hasattr(best_tempo, 'item'):
-            best_tempo = best_tempo.item()
-        
-        # Round to nearest 0.01 for precision
-        self.tempo = round(best_tempo, 2)
         print(f"Detected BPM: {self.tempo}")
-        
-        # Print all correlation scores for debugging
-        print("BPM detection scores:")
-        for i, start_bpm in enumerate(start_bpms):
-            if i < len(start_bpms):
-                print(f"  Start BPM {start_bpm}: Score calculated")
-        
         return self.tempo
     
     def detect_key(self) -> Tuple[str, str]:
         """
         Detect musical key using enhanced chromagram analysis.
-        
-        Returns:
-            Tuple[str, str]: (key, mode) where mode is 'major' or 'minor'
         """
         print("Detecting musical key...")
         
-        # Extract chromagram with different parameters for better accuracy
         chromagram = librosa.feature.chroma_cqt(
             y=self.y, 
             sr=self.sr,
             hop_length=512,
-            bins_per_octave=12
+            bins_per_octave=12 * 3, # Use more bins for better resolution
+            n_octaves=7
         )
         
-        # Use weighted average over time (give more weight to louder sections)
+        # Weight chromagram by RMS energy to focus on harmonically rich parts
         rms = librosa.feature.rms(y=self.y, hop_length=512)[0]
-        rms_normalized = rms / np.max(rms)
+        # Ensure rms has same number of frames as chromagram
+        rms_normalized = rms[:chromagram.shape[1]] / (np.max(rms) + 1e-6)
         
-        # Weight chromagram by RMS energy
-        weighted_chroma = np.zeros(12)
-        for i in range(chromagram.shape[1]):
-            if i < len(rms_normalized):
-                weighted_chroma += chromagram[:, i] * rms_normalized[i]
-        
-        # Normalize
-        weighted_chroma = weighted_chroma / np.sum(weighted_chroma)
-        
-        # Define enhanced key profiles (Krumhansl-Kessler profiles)
+        # Weighted average of chroma features
+        chroma_weighted = np.sum(chromagram * rms_normalized, axis=1)
+        chroma_normalized = chroma_weighted / (np.sum(chroma_weighted) + 1e-6)
+
+        # Krumhansl-Kessler key profiles
         major_profile = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
         minor_profile = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
         
         # Normalize profiles
-        major_profile = major_profile / np.sum(major_profile)
-        minor_profile = minor_profile / np.sum(minor_profile)
-        
-        # Calculate correlation for each key
+        major_profile /= np.sum(major_profile)
+        minor_profile /= np.sum(minor_profile)
+
         major_correlations = []
         minor_correlations = []
         
         for i in range(12):
-            # Rotate chroma vector
-            rotated_chroma = np.roll(weighted_chroma, i)
-            rotated_chroma = rotated_chroma / np.sum(rotated_chroma)
+            # To test for a key, we shift the song's chroma BACK to align with C
+            # A roll of -1 shifts C# to C, D to C#, etc.
+            rotated_chroma = np.roll(chroma_normalized, -i)
             
-            # Calculate correlations
             major_corr = np.corrcoef(rotated_chroma, major_profile)[0, 1]
             minor_corr = np.corrcoef(rotated_chroma, minor_profile)[0, 1]
             
             major_correlations.append(major_corr)
             minor_correlations.append(minor_corr)
-        
+
         # Find best match
         best_major_idx = np.argmax(major_correlations)
         best_minor_idx = np.argmax(minor_correlations)
-        best_major_corr = major_correlations[best_major_idx]
-        best_minor_corr = minor_correlations[best_minor_idx]
         
-        # No biases - let the algorithm work naturally
-        # The biases were causing incorrect detection
-        
-        if best_major_corr > best_minor_corr:
+        if major_correlations[best_major_idx] > minor_correlations[best_minor_idx]:
             self.key = self.key_mapping[best_major_idx]
             self.mode = 'major'
         else:
             self.key = self.key_mapping[best_minor_idx]
             self.mode = 'minor'
-        
-        # Get Camelot notation
+            
         camelot_key = f"{self.key}{'m' if self.mode == 'minor' else ''}"
-        camelot_notation = self.camelot_wheel.get(camelot_key, f"{self.key}{'m' if self.mode == 'minor' else ''}")
+        camelot_notation = self.camelot_wheel.get(camelot_key, "N/A")
         
         print(f"Detected key: {self.key} {self.mode} (Camelot: {camelot_notation})")
-        print(f"Major correlation: {best_major_corr:.3f}, Minor correlation: {best_minor_corr:.3f}")
-        
-        # Print all key correlations for debugging
-        print("Key detection correlations:")
-        for i, key in enumerate(self.key_mapping.values()):
-            if i < len(major_correlations):
-                print(f"  {key} Major: {major_correlations[i]:.3f}, Minor: {minor_correlations[i]:.3f}")
         
         return self.key, self.mode
     
     def generate_beatgrid(self) -> List[float]:
         """
-        Generate beatgrid timestamps.
-        
-        Returns:
-            List[float]: List of beat timestamps in seconds
+        Generate a perfectly regular beatgrid based on the detected BPM and first beat.
         """
         print("Generating beatgrid...")
         
-        # Get onset strength
-        onset_env = librosa.onset.onset_strength(y=self.y, sr=self.sr)
+        # We already calculated self.beats in detect_bpm(). No need to run beat_track again.
         
-        # Detect beats
-        self.beats = librosa.beat.beat_track(
-            onset_envelope=onset_env,
-            sr=self.sr,
-            hop_length=512,
-            start_bpm=self.tempo,
-            units='time'
-        )[1]
-        
-        # Create beatgrid with consistent spacing
         beatgrid = []
-        if len(self.beats) > 0 and self.tempo > 0:
-            # Use detected tempo to create regular grid
+        if self.beats is not None and len(self.beats) > 0 and self.tempo > 0:
+            first_beat_time = self.beats[0]
             beat_interval = 60.0 / self.tempo
-            print(f"Beat interval: {beat_interval:.3f} seconds")
+            track_duration = len(self.y) / self.sr
             
-            # Start from the first detected beat
-            first_detected_beat = self.beats[0]
-            print(f"First detected beat at: {first_detected_beat:.3f} seconds")
+            # Generate grid extending forward and backward from the first detected beat
+            # This creates a "quantized" grid, typical for DJ software.
+            current_beat = first_beat_time
+            while current_beat > 0:
+                current_beat -= beat_interval
+            current_beat += beat_interval # Step back into the track's timeframe
+
+            while current_beat < track_duration:
+                beatgrid.append(current_beat)
+                current_beat += beat_interval
+
+            self.beatgrid = beatgrid
+            print(f"Generated {len(self.beatgrid)} beatgrid markers based on a perfect grid.")
+        else:
+            self.beatgrid = []
+            print("Could not generate beatgrid: No beats were detected.")
             
-            # Backtrack to create beats before the first detected beat
-            # Calculate how many beats we need to go back to reach 0 seconds
-            beats_before_first = int(first_detected_beat / beat_interval)
-            
-            # Generate beats backwards from the first detected beat
-            for i in range(beats_before_first, -1, -1):
-                beat_time = first_detected_beat - (beats_before_first - i) * beat_interval
-                if beat_time >= 0:  # Only add beats that are at or after 0 seconds
-                    beatgrid.append(beat_time)
-            
-            # Generate beats forward from the first detected beat
-            current_time = first_detected_beat + beat_interval
-            while current_time <= len(self.y) / self.sr:
-                beatgrid.append(current_time)
-                current_time += beat_interval
-            
-            # Sort the beatgrid to ensure proper order
-            beatgrid.sort()
-            
-            print(f"Beatgrid starting at: {beatgrid[0]:.3f} seconds")
-            print(f"Generated {len(beatgrid)} beats (including {beats_before_first} beats before first detected beat)")
-        
-        self.beatgrid = beatgrid
-        print(f"Generated {len(self.beatgrid)} beatgrid markers")
-        
         return self.beatgrid
     
     def generate_waveform_data(self) -> Dict:
