@@ -84,7 +84,7 @@ const Terms = () => {
           <section className="terms-section">
             <h2>10. Contact Information</h2>
             <p>
-              If you have any questions about these Terms of Service, please contact us at support@deckadence.com
+              If you have any questions about these Terms of Service, please contact us at [Support/Terms Email]
             </p>
           </section>
 

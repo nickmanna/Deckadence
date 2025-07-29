@@ -149,8 +149,8 @@ const Privacy = () => {
               If you have any questions about this privacy policy or our data practices, please contact us at:
             </p>
             <div className="contact-info">
-              <p><strong>Email:</strong> privacy@deckadence.com</p>
-              <p><strong>Address:</strong> [Your Business Address]</p>
+              <p><strong>Email:</strong> [Support/Privacy Email]</p>
+              <p><strong>Address:</strong> [Business Address]</p>
             </div>
           </section>
 

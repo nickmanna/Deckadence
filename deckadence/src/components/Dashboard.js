@@ -9,7 +9,7 @@ import AuthModal from './AuthModal';
 import './Dashboard.css';
 
 const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
-  const [activeTab, setActiveTab] = useState('blind-blend');
+  const [activeTab, setActiveTab] = useState('games');
   const [showTrackSelection, setShowTrackSelection] = useState(false);
   const [showAudioUploader, setShowAudioUploader] = useState(false);
   const [showTrackLibrary, setShowTrackLibrary] = useState(false);
@@ -25,7 +25,7 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
   const tabs = [
     { id: 'discover', label: 'Discover', icon: '🎵', restricted: true },
     { id: 'create', label: 'Create', icon: '🎧', restricted: true },
-    { id: 'blind-blend', label: 'Blind Blend', icon: '🎚️', restricted: false }
+    { id: 'games', label: 'Games', icon: '🎚️', restricted: false }
   ];
 
   const handleTabClick = (tabId) => {
@@ -192,28 +192,94 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
           </div>
         );
       
-      case 'blind-blend':
+      case 'games':
         return (
           <div className="tab-content">
-            <h2>Blind Blend Challenge</h2>
-            <p>Test your DJ skills by mixing tracks without knowing what's coming next!</p>
-            <div className="blind-blend-content">
-              <div className="challenge-info">
-                <h3>How it works:</h3>
-                <ul>
-                  <li>🎵 Tracks are selected randomly</li>
-                  <li>🎚️ You control the mixing in real-time</li>
-                  <li>⏱️ Limited time to blend tracks</li>
-                  <li>🏆 Score based on smoothness and creativity</li>
-                </ul>
+            <h2>DJ Game Arcade</h2>
+            <p>Test your DJ skills by playing games!</p>
+            <div className="games-content">
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img1.jpg" alt="Game 1" />
+                <h3>Driving</h3>
+                <p>Drive the Car</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
               </div>
-              <div className="game-controls">
-                <button className="start-game-btn" onClick={handleStartBlindBlend}>
-                  Start Blind Blend Challenge
-                </button>
-                <button className="practice-btn">
-                  Practice Mode
-                </button>
+
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img2.jpg" alt="Game 2" />
+                <h3>Catch the Apples</h3>
+                <p>Catch the Apples</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
+              </div>
+
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img3.jpg" alt="Game 3" />
+                <h3>Blind Blend</h3>
+                <p>Mix Without Knowing the Tracks</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
+              </div>
+
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img4.jpg" alt="Game 4" />
+                <h3>Shadow Mix</h3>
+                <p>Attempt to copy someone else's mix</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
+              </div>
+
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img5.jpg" alt="Game 5" />
+                <h3>Cannon</h3>
+                <p>Shoot the Cannon</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
+              </div>
+
+              <div className="game-section">
+                <img src="/images/ui-elements/game_img6.jpg" alt="Game 6" />
+                <h3>Guitar Hero</h3>
+                <p>Play the Guitar</p>
+                <div className="game-controls">
+                  <button className="start-game-btn" onClick={handleStartBlindBlend}>
+                    Play Now
+                  </button>
+                  <button className="practice-btn">
+                    Leaderboard
+                  </button>
+                </div>
               </div>
               {isGuest && (
                 <div className="guest-notice">

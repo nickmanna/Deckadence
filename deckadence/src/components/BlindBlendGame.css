@@ -6,6 +6,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Game Header */
@@ -18,6 +20,9 @@
   border-bottom: 1px solid #404040;
   height: 80px;
   flex-shrink: 0;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .header-left h1 {
@@ -90,6 +95,9 @@
   justify-content: center;
   min-height: 60vh;
   text-align: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .loading-spinner {
@@ -126,6 +134,9 @@
   align-items: center;
   min-height: 60vh;
   padding: 48px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .start-content {
@@ -233,6 +244,9 @@
   display: flex;
   flex: 1;
   background: #1E1E1E;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* Tracks Container */
@@ -612,6 +626,8 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 48px;
+  width: 100%;
+  max-width: 1400px;
 }
 
 .score-display {

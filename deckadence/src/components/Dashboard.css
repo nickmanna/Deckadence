@@ -4,7 +4,7 @@
   background: linear-gradient(
     rgba(0, 0, 0, 0.7),
     rgba(0, 0, 0, 0.8)
-  ), url('../deckadence_bg.jpg');
+  ), url('../../public/images/backgrounds/deckadence_bg.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -240,11 +240,67 @@
   margin: 0;
 }
 
-/* Blind Blend specific styles */
-.blind-blend-content {
+.games-content {
   display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Games specific styles */
+.game-section {
+  display: grid;
+  grid-template-areas:
+    "banner"
+    "title"
+    "content"
+    "buttons";
+  grid-template-columns: 1fr;
+  grid-template-rows: 80px auto 1fr auto;
+  gap: 1rem;
+  padding: 1.2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  aspect-ratio: 1;
+  width: 280px;
+  height: 300px;
+}
+
+.game-section img {
+  grid-area: banner;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.game-section h3 {
+  grid-area: title;
+  color: #eee;
+  margin: 0;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.game-section p,
+.game-section ul {
+  grid-area: content;
+  margin: 0;
+  text-align: center;
+}
+
+.game-section .game-controls {
+  grid-area: buttons;
+  display: flex;
+  gap: 0.5rem;
   flex-direction: column;
-  gap: 2rem;
+  justify-content: center;
 }
 
 .challenge-info {
