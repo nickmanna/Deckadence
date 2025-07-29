@@ -1,0 +1,129 @@
+.terms-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #353535 0%, #202020 100%);
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.terms-content {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #202020;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.terms-header {
+  background: linear-gradient(135deg, #353535 0%, #202020 100%);
+  color: white;
+  padding: 40px;
+  text-align: center;
+  position: relative;
+}
+
+.terms-header h1 {
+  margin: 0 0 20px 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.back-link {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 10px 15px;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.terms-body {
+  padding: 40px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.terms-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #353535;
+}
+
+.terms-section:last-child {
+  border-bottom: none;
+}
+
+.terms-section h2 {
+  color: #d8d8d8;
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.terms-section p {
+  margin-bottom: 15px;
+  font-size: 1rem;
+  color: #888888;
+}
+
+.terms-section ul {
+  margin: 15px 0;
+  padding-left: 20px;
+}
+
+.terms-section li {
+  margin-bottom: 8px;
+  color: #888888;
+}
+
+.terms-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 2px solid #353535;
+  text-align: center;
+  color: #888888;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .terms-container {
+    padding: 10px;
+  }
+  
+  .terms-content {
+    border-radius: 10px;
+  }
+  
+  .terms-header {
+    padding: 30px 20px;
+  }
+  
+  .terms-header h1 {
+    font-size: 2rem;
+  }
+  
+  .back-link {
+    position: static;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+  
+  .terms-body {
+    padding: 20px;
+  }
+  
+  .terms-section h2 {
+    font-size: 1.3rem;
+  }
+} 

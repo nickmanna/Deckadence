@@ -1,0 +1,157 @@
+.privacy-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #353535 0%, #202020 100%);
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.privacy-content {
+  max-width: 800px;
+  margin: 0 auto;
+  background: 202020;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.privacy-header {
+  background: linear-gradient(135deg, #353535 0%, #202020 100%);
+  color: white;
+  padding: 40px;
+  text-align: center;
+  position: relative;
+}
+
+.privacy-header h1 {
+  margin: 0 0 20px 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.back-link {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 10px 15px;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.privacy-body {
+  padding: 40px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.privacy-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #353535;
+}
+
+.privacy-section:last-child {
+  border-bottom: none;
+}
+
+.privacy-section h2 {
+  color: #d8d8d8;
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.privacy-section h3 {
+  color: #d8d8d8;
+  font-size: 1.2rem;
+  margin: 20px 0 10px 0;
+  font-weight: 600;
+}
+
+.privacy-section p {
+  margin-bottom: 15px;
+  font-size: 1rem;
+  color: #888888;
+}
+
+.privacy-section ul {
+  margin: 15px 0;
+  padding-left: 20px;
+}
+
+.privacy-section li {
+  margin-bottom: 8px;
+  color: #888888;
+}
+
+.contact-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 10px;
+  margin-top: 15px;
+  border-left: 4px solid #66eaea;
+}
+
+.contact-info p {
+  margin: 5px 0;
+  font-weight: 500;
+}
+
+.privacy-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 2px solid #353535;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .privacy-container {
+    padding: 10px;
+  }
+  
+  .privacy-content {
+    border-radius: 10px;
+  }
+  
+  .privacy-header {
+    padding: 30px 20px;
+  }
+  
+  .privacy-header h1 {
+    font-size: 2rem;
+  }
+  
+  .back-link {
+    position: static;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+  
+  .privacy-body {
+    padding: 20px;
+  }
+  
+  .privacy-section h2 {
+    font-size: 1.3rem;
+  }
+  
+  .privacy-section h3 {
+    font-size: 1.1rem;
+  }
+  
+  .contact-info {
+    padding: 15px;
+  }
+} 
