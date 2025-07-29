@@ -8,7 +8,7 @@ import { getStorage } from 'firebase/storage';
 // Replace with your actual Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBIWYLdAcR7aw_p9WFkYx8o6ORQ2wre6mg",
-  authDomain: "deckadence-2646d.firebaseapp.com",
+  authDomain: "deckadence.online",
   projectId: "deckadence-2646d",
   storageBucket: "deckadence-2646d.firebasestorage.app",
   messagingSenderId: "173466998948",
