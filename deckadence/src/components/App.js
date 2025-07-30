@@ -6,6 +6,7 @@ import Dashboard from './Dashboard';
 import Terms from './Terms';
 import Privacy from './Privacy';
 import Footer from './Footer';
+import GreenRoom from './GreenRoom';
 import './App.css';
 
 const AppContent = () => {
@@ -105,6 +106,7 @@ const App = () => {
           <Route path="/" element={<AppContent />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/green-room" element={<GreenRoom />} />
         </Routes>
       </AuthProvider>
     </Router>

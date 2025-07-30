@@ -8,7 +8,7 @@
 .privacy-content {
   max-width: 800px;
   margin: 0 auto;
-  background: 202020;
+  background: #202020;
   border-radius: 15px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -95,7 +95,7 @@
 }
 
 .contact-info {
-  background: #f8f9fa;
+  background: #272727;
   padding: 20px;
   border-radius: 10px;
   margin-top: 15px;
@@ -104,6 +104,7 @@
 
 .contact-info p {
   margin: 5px 0;
+  color: #b1b1b1;
   font-weight: 500;
 }
 

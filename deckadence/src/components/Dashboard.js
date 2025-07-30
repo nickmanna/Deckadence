@@ -7,6 +7,7 @@ import AudioUploader from './AudioUploader';
 import TrackLibrary from './TrackLibrary';
 import AuthModal from './AuthModal';
 import './Dashboard.css';
+import { Link } from 'react-router-dom';
 
 const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
   const [activeTab, setActiveTab] = useState('games');
@@ -25,7 +26,7 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
   const tabs = [
     { id: 'discover', label: 'Discover', icon: '🎵', restricted: true },
     { id: 'create', label: 'Create', icon: '🎧', restricted: true },
-    { id: 'games', label: 'Games', icon: '🎚️', restricted: false }
+    { id: 'games', label: 'Games', icon: '🕹️', restricted: false }
   ];
 
   const handleTabClick = (tabId) => {
@@ -168,6 +169,16 @@ const Dashboard = ({ isGuest, onLogout, onShowAuth, onSignIn, onSignUp }) => {
                 {analyzedTracks.length > 0 && (
                   <span className="track-count">({analyzedTracks.length} tracks analyzed)</span>
                 )}
+              </div>
+
+              <div className="create-section">
+                <h3>The Green Room</h3>
+                <p>Practice your mixing skills with our interactive mixing tools.</p>
+                <Link to="/green-room">
+                  <button className="library-btn">
+                    🎹 Enter the Studio
+                  </button>
+                </Link>
               </div>
               
               <div className="create-section">
