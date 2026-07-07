@@ -86,6 +86,24 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member "serviceAccount:${SA_EMAIL}" --role "roles/artifactregistry.writer"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member "serviceAccount:${SA_EMAIL}" --role "roles/iam.serviceAccountUser"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:${SA_EMAIL}" --role "roles/serviceusage.serviceUsageConsumer"
+# ^ needed because `firebase deploy` checks whether each target API
+#   (firebasestorage.googleapis.com etc.) is enabled before deploying -
+#   without this role that check 403s even though the deploy itself would work.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:${SA_EMAIL}" --role "roles/firebasestorage.admin"
+# ^ needed for `firebase deploy --only storage` to manage the storage.rules
+#   ruleset binding.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:${SA_EMAIL}" --role "roles/firebase.viewer"
+# ^ the actual fix for a confusing failure: `firebase deploy --only storage`
+#   calls firebasestorage.googleapis.com's defaultBucket lookup, which 404s
+#   ("Firebase Storage has not been set up") for a service account that
+#   only holds firebasestorage.admin - it needs this baseline Firebase
+#   project read role too. firebase.json also pins storage.bucket
+#   explicitly (see deckadence/firebase.json) to reduce reliance on that
+#   lookup, but this role is still required.
 
 # 2d. Create the Artifact Registry repo the backend image gets pushed to
 gcloud artifacts repositories create deckadence \

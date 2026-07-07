@@ -68,10 +68,11 @@ the security-relevant decisions:
   minted for (`--attribute-condition "assertion.repository == '<owner>/<repo>'"`).
 - **The deploy service account is least-privilege and dedicated.** It's not
   a personal or Owner-role account — it holds only the specific roles each
-  deploy step needs (Firebase Hosting Admin, Firebase Rules Admin, Cloud
-  Run Admin, Artifact Registry Writer). If it's ever misused, the blast
-  radius is bounded to "can deploy this app," not "can do anything in this
-  GCP project."
+  deploy step needs (Firebase Hosting Admin, Firebase Rules Admin, Firebase
+  Storage Admin, Firebase Viewer, Datastore Index Admin, Cloud Run Admin,
+  Artifact Registry Writer, Service Account User, Service Usage Consumer).
+  If it's ever misused, the blast radius is bounded to "can
+  deploy this app," not "can do anything in this GCP project."
 - **Production deploys go through a GitHub Environment** (`production`),
   which supports required reviewers if you want a manual approval gate
   before every push to `main` actually deploys. Preview deploys use a
