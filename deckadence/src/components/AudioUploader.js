@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { TrackService } from '../services/trackService';
 import './AudioUploader.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
 const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
   const [uploadState, setUploadState] = useState('idle'); // idle, uploading, analyzing, complete, error
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -20,7 +22,7 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
   useEffect(() => {
     const checkBackendStatus = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/health', {
+        const response = await fetch(`${API_BASE_URL}/api/health`, {
           method: 'GET',
           timeout: 3000
         });
@@ -91,7 +93,7 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
       
       // Call the backend API
       try {
-        const response = await fetch('http://localhost:5000/api/analyze', {
+        const response = await fetch(`${API_BASE_URL}/api/analyze`, {
           method: 'POST',
           body: formData,
         });

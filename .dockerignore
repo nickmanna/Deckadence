@@ -1,0 +1,11 @@
+.git
+.github
+deckadence
+docs
+uploads
+venv
+__pycache__
+*.pyc
+*.md
+.env
+.env.*

@@ -1,70 +1,44 @@
-# Getting Started with Create React App
+# Deckadence Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React (Create React App) frontend for Deckadence. Handles auth, track
+upload/library UI, and talks to Firebase (Auth/Firestore/Storage) and the
+Flask backend in [`../main.py`](../main.py).
+
+## Setup
+
+```bash
+cp .env.example .env   # fill in your Firebase project values
+npm install
+npm start
+```
+
+The app reads Firebase config and the backend API URL from environment
+variables — see [`.env.example`](.env.example) and
+[`../docs/FIREBASE_SETUP.md`](../docs/FIREBASE_SETUP.md). Never commit `.env`
+or hardcode credentials in `src/firebase.js`.
 
 ## Available Scripts
 
-In the project directory, you can run:
+- `npm start` — run the dev server at [http://localhost:3000](http://localhost:3000)
+- `npm test` — run the test runner in watch mode
+- `npm run build` — production build to `build/`
+- `npm run eject` — eject CRA config (one-way, avoid unless necessary)
 
-### `npm start`
+## Project structure
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
+src/
+├── components/   UI components (Dashboard, TrackLibrary, AudioUploader, ...)
+├── contexts/     React context providers (AuthContext)
+├── services/     API/Firestore access (trackService)
+└── firebase.js   Firebase SDK initialization (config via env vars)
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Security notes
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `firestore.rules` and `storage.rules` (project root) scope all reads/writes
+  to the authenticated owner — review these before changing data access
+  patterns.
+- The Firebase web `apiKey` is not a secret by design, but keep it in `.env`
+  rather than source so it isn't tied to git history and can be rotated
+  without a code change. See [`../SECURITY.md`](../SECURITY.md).

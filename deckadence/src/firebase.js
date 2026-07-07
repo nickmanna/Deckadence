@@ -4,17 +4,25 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Your Firebase configuration
-// Replace with your actual Firebase config
+// Firebase configuration is loaded from environment variables so that
+// per-project values never need to be committed to source control.
+// See .env.example for the required REACT_APP_FIREBASE_* variables.
 const firebaseConfig = {
-  apiKey: "AIzaSyBIWYLdAcR7aw_p9WFkYx8o6ORQ2wre6mg",
-  authDomain: "deckadencedj.com",
-  projectId: "deckadence-2646d",
-  storageBucket: "deckadence-2646d.firebasestorage.app",
-  messagingSenderId: "173466998948",
-  appId: "1:173466998948:web:acd883773ea9b2683fae31",
-  measurementId: "G-ZRE3TFJ2RW"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
+
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error(
+    'Missing Firebase configuration. Copy .env.example to .env and fill in your ' +
+    'REACT_APP_FIREBASE_* values before starting the app.'
+  );
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
