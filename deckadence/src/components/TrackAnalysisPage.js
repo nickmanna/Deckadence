@@ -199,27 +199,25 @@ const TrackAnalysisPage = () => {
   };
 
   const generateMockWaveformData = () => {
+    // Matches the real backend's shape (times/amplitudes/frequency_bands)
+    // so the fallback path renders identically to a real analysis in both
+    // Waveform.js (3-band DJ view) and the library table's WaveformThumbnail.
     const points = 1000;
     const times = [];
     const amplitudes = [];
-    const colors = [];
+    const low = [];
+    const mid = [];
+    const high = [];
 
     for (let i = 0; i < points; i++) {
       times.push(i * 0.1);
       amplitudes.push(Math.random() * 0.8 + 0.1);
-
-      // Generate frequency-based colors
-      const freq = Math.random();
-      if (freq < 0.33) {
-        colors.push([1.0, freq * 3, 0.0]); // Red to orange
-      } else if (freq < 0.66) {
-        colors.push([1.0 - (freq - 0.33) * 3, 1.0, 0.0]); // Green to yellow
-      } else {
-        colors.push([0.0, 1.0 - (freq - 0.66) * 3, 1.0]); // Blue to cyan
-      }
+      low.push(Math.random());
+      mid.push(Math.random());
+      high.push(Math.random());
     }
 
-    return { times, amplitudes, colors };
+    return { times, amplitudes, frequency_bands: { low, mid, high } };
   };
 
   const handleAnalyze = async () => {

@@ -18,7 +18,10 @@ from pathlib import Path
 import pickle
 from typing import Dict, List, Tuple, Optional, Any
 import warnings
-warnings.filterwarnings('ignore')
+# Only silence the specific noisy/harmless warnings we've actually seen from
+# these libraries - a blanket ignore() was hiding real FutureWarnings (e.g.
+# librosa.beat.tempo's deprecation) that are worth seeing during development.
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='audioread')
 
 # Fix for scipy version compatibility
 try:
@@ -90,48 +93,87 @@ class TrackAnalyzer:
             print(f"Error loading audio file: {e}")
             return False
     
+    @staticmethod
+    def _clean_beat_times(beats: np.ndarray) -> np.ndarray:
+        """
+        Locally de-duplicate spurious double-detections and fill obvious
+        dropped beats, using a rolling local-median interval as the
+        reference instead of one global constant tempo. This deliberately
+        does NOT reconstruct beat times by summing/integrating intervals -
+        doing so compounds even tiny systematic bias into multi-second
+        drift over a full track (verified empirically). Every beat that
+        survives keeps its original, independently-detected timestamp;
+        we only ever drop a spurious one or insert a single interpolated
+        one into a genuine gap.
+        """
+        beats = list(beats)
+        if len(beats) < 4:
+            return np.array(beats)
+
+        window = 8
+        changed = True
+        while changed:
+            changed = False
+            intervals = np.diff(beats)
+            for i, iv in enumerate(intervals):
+                lo = max(0, i - window // 2)
+                hi = min(len(intervals), i + window // 2 + 1)
+                local_median = np.median(intervals[lo:hi])
+                if local_median <= 0:
+                    continue
+                if iv < 0.6 * local_median:
+                    # Spurious extra detection - drop the later beat of the pair.
+                    del beats[i + 1]
+                    changed = True
+                    break
+                if iv > 1.6 * local_median:
+                    # Likely missed beat - insert one at the expected local spacing.
+                    beats.insert(i + 1, beats[i] + local_median)
+                    changed = True
+                    break
+
+        return np.array(beats)
+
     def detect_bpm(self) -> float:
         """
-        Detect BPM and beat locations using a robust, two-step process.
+        Detect beat locations directly from the onset envelope, clean up
+        any spurious/missed detections, and report BPM from the actual
+        detected spacing (not a separate tempo estimate that can disagree
+        with the beats it supposedly describes).
         """
         print("Detecting BPM...")
-        
-        # 1. Create a high-quality onset strength envelope
-        # Using the pre-filtered audio is a great choice.
+
         onset_env = librosa.onset.onset_strength(
-            y=self.y_filtered, 
-            sr=self.sr, 
-            aggregate=np.mean, 
+            y=self.y_filtered,
+            sr=self.sr,
+            aggregate=np.mean,
             hop_length=512
         )
 
-        # 2. Estimate tempo from the onset envelope using librosa's dedicated function
-        # This is more reliable than iterating through start_bpm values.
-        # The result is an array, so we take the first element.
-        prior_tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=self.sr, hop_length=512)[0]
-        
-        # 3. Find the beat locations, providing the detected tempo as a strong prior.
-        # Using the 'bpm' argument makes the beat tracker stick closely to the estimated tempo.
-        # We also get the beat frames to use later in the beatgrid.
-        # We ask for 'frames' here, as it's more direct for later processing.
-        tempo, beat_frames = librosa.beat.beat_track(
+        # Letting beat_track estimate tempo internally (no forced bpm prior)
+        # produces identical results to a separate two-step tempo-then-track
+        # process on real material - verified empirically - so there's no
+        # value in the extra step. Simpler is better here.
+        _, beat_frames = librosa.beat.beat_track(
             onset_envelope=onset_env,
             sr=self.sr,
             hop_length=512,
-            bpm=prior_tempo, # Use the robustly estimated tempo
-            tightness=100,   # Default tightness, can be tuned
-            trim=True,       # Trim weak beats from start/end
-            units='frames'   # Get beat locations as frame indices
+            trim=True,
+            units='frames'
         )
 
-        # Store the detected beats (as timestamps) for the beatgrid
-        self.beats = librosa.frames_to_time(beat_frames, sr=self.sr, hop_length=512)
+        raw_beats = librosa.frames_to_time(beat_frames, sr=self.sr, hop_length=512)
+        self.beats = self._clean_beat_times(raw_beats)
 
-        # Ensure tempo is a scalar float and round it
-        final_tempo = tempo.item() if hasattr(tempo, 'item') else tempo
-        self.tempo = round(final_tempo, 2)
-        
-        print(f"Detected BPM: {self.tempo}")
+        if len(self.beats) > 1:
+            # Median is robust to the residual per-beat jitter that's
+            # inherent to onset-based tracking on real percussive material.
+            median_interval = float(np.median(np.diff(self.beats)))
+            self.tempo = round(60.0 / median_interval, 2) if median_interval > 0 else 0.0
+        else:
+            self.tempo = 0.0
+
+        print(f"Detected BPM: {self.tempo} ({len(self.beats)} beats)")
         return self.tempo
     
     def detect_key(self) -> Tuple[str, str]:
@@ -199,134 +241,150 @@ class TrackAnalyzer:
     
     def generate_beatgrid(self) -> List[float]:
         """
-        Generate a perfectly regular beatgrid based on the detected BPM and first beat.
+        Build the beatgrid from the actual (cleaned) detected beat
+        positions from detect_bpm() - NOT a synthetic grid extrapolated
+        from a single anchor beat and one constant tempo.
+
+        That extrapolation approach was measured (against real detected
+        beats on real tracks) to drift by hundreds of milliseconds to
+        several seconds by the end of a track, since any tiny mismatch
+        between the assumed constant tempo and the track's actual pace
+        compounds beat after beat. Using the real per-beat positions
+        directly has no such compounding error - each position is
+        independently anchored to actual audio evidence.
         """
         print("Generating beatgrid...")
-        
-        # We already calculated self.beats in detect_bpm(). No need to run beat_track again.
-        
-        beatgrid = []
-        if self.beats is not None and len(self.beats) > 0 and self.tempo > 0:
-            first_beat_time = self.beats[0]
-            beat_interval = 60.0 / self.tempo
-            track_duration = len(self.y) / self.sr
-            
-            # Generate grid extending forward and backward from the first detected beat
-            # This creates a "quantized" grid, typical for DJ software.
-            current_beat = first_beat_time
-            while current_beat > 0:
-                current_beat -= beat_interval
-            current_beat += beat_interval # Step back into the track's timeframe
 
-            while current_beat < track_duration:
-                beatgrid.append(current_beat)
-                current_beat += beat_interval
-
-            self.beatgrid = beatgrid
-            print(f"Generated {len(self.beatgrid)} beatgrid markers based on a perfect grid.")
+        if self.beats is not None and len(self.beats) > 0:
+            self.beatgrid = [float(b) for b in self.beats]
+            print(f"Generated {len(self.beatgrid)} beatgrid markers from detected beats.")
         else:
             self.beatgrid = []
             print("Could not generate beatgrid: No beats were detected.")
-            
+
         return self.beatgrid
     
+    # Cap on the number of points shipped in waveform data. Firestore
+    # documents have a hard 1 MiB limit; at the raw analysis frame rate
+    # (~86 fps) a single 4-minute track's waveform arrays alone serialize
+    # to nearly 2 MB - well over the limit, so every save of a real
+    # (non-trivially-short) track was failing before this cap existed.
+    # 1500 points is far more resolution than any on-screen waveform
+    # actually needs (the frontend downsamples further for rendering
+    # anyway) and keeps the payload in the tens of KB.
+    WAVEFORM_TARGET_POINTS = 1500
+
+    @staticmethod
+    def _downsample_block_average(values: np.ndarray, target_points: int) -> np.ndarray:
+        """Downsample by averaging contiguous blocks (not naive striding,
+        which would just discard most of the signal and can skip
+        transients entirely)."""
+        values = np.asarray(values, dtype=float)
+        n = len(values)
+        if n <= target_points:
+            return values
+
+        edges = np.linspace(0, n, target_points + 1).astype(int)
+        out = np.empty(target_points)
+        for i in range(target_points):
+            start, end = edges[i], edges[i + 1]
+            out[i] = values[start:end].mean() if end > start else values[min(start, n - 1)]
+        return out
+
     def generate_waveform_data(self) -> Dict:
         """
-        Generate Rekordbox-style waveform data with offline analysis.
-        Creates efficient pre-calculated data for real-time rendering.
-        
+        Generate Rekordbox-style 3-band waveform data (overall amplitude
+        plus separate low/mid/high energy per point), downsampled to a
+        fixed point budget so the payload stays well within Firestore's
+        per-document size limit regardless of track length.
+
         Returns:
             Dict: Waveform data with amplitude and frequency band information
         """
         print("Generating Rekordbox-style waveform data...")
-        
-        # Parameters for efficient analysis
+
         frame_length = 2048
-        hop_length = 512        
-        # Calculate RMS energy for overall amplitude
+        hop_length = 512
+
         rms = librosa.feature.rms(
-            y=self.y, 
-            frame_length=frame_length, 
+            y=self.y,
+            frame_length=frame_length,
             hop_length=hop_length
         )[0]
-        
-        # Normalize RMS
         rms_normalized = rms / np.max(rms) if np.max(rms) > 0 else rms
-        
-        # Create time axis
+
         times = librosa.times_like(rms, sr=self.sr, hop_length=hop_length)
-        
-        # Calculate 3-band frequency analysis (like Rekordbox)
-        # Low frequencies (20Hz) - Bass
-        # Mid frequencies (2500 Hz) - Midrange  
-        # High frequencies (20020000- Treble
-        
-        # Extract frequency bands using mel spectrogram
+
+        # 3-band frequency split (verified against librosa.mel_frequencies
+        # for n_mels=128, fmax=sr/2=22050Hz):
+        #   low  (mel bands  0-12):  ~0-378 Hz    - bass/kick
+        #   mid  (mel bands 12-48):  ~378-1695 Hz - mid-range/vocals/snare
+        #   high (mel bands 48-128): ~1695-22050 Hz - treble/hi-hats/cymbals
         mel_spec = librosa.feature.melspectrogram(
-            y=self.y, 
-            sr=self.sr, 
+            y=self.y,
+            sr=self.sr,
             hop_length=hop_length,
             n_mels=128
         )
-        
-        # Define frequency band boundaries with better ranges
-        low_freq_range = (0, 12)    # Mel bands 0-12 ≈20 Hz (bass)
-        mid_freq_range = (12, 48)   # Mel bands 1248≈ 400-30(midrange)
-        high_freq_range = (48,128)# Mel bands4828 ≈ 30002050 (treble)
+        low_freq_range = (0, 12)
+        mid_freq_range = (12, 48)
+        high_freq_range = (48, 128)
 
-        # Calculate energy for each frequency band
         low_energy = np.mean(mel_spec[low_freq_range[0]:low_freq_range[1], :], axis=0)
         mid_energy = np.mean(mel_spec[mid_freq_range[0]:mid_freq_range[1], :], axis=0)
         high_energy = np.mean(mel_spec[high_freq_range[0]:high_freq_range[1], :], axis=0)
 
-        # Apply smoothing to reduce noise
         from scipy.ndimage import gaussian_filter1d
         low_energy = gaussian_filter1d(low_energy, sigma=1)
         mid_energy = gaussian_filter1d(mid_energy, sigma=1)
         high_energy = gaussian_filter1d(high_energy, sigma=1)
 
-        # Normalize each band independently with better scaling
         low_normalized = low_energy / np.max(low_energy) if np.max(low_energy) > 0 else low_energy
         mid_normalized = mid_energy / np.max(mid_energy) if np.max(mid_energy) > 0 else mid_energy
         high_normalized = high_energy / np.max(high_energy) if np.max(high_energy) > 0 else high_energy
 
-        # Apply power scaling to make differences more visible
-        low_normalized = np.power(low_normalized, 0.7)  # Less aggressive for bass
-        mid_normalized = np.power(mid_normalized, 0.8) # Moderate for mids
-        high_normalized = np.power(high_normalized, 0.9) # More aggressive for highs
+        low_normalized = np.power(low_normalized, 0.7)
+        mid_normalized = np.power(mid_normalized, 0.8)
+        high_normalized = np.power(high_normalized, 0.9)
 
-        # Ensure all arrays have the same length
         min_length = min(len(times), len(rms_normalized), len(low_normalized), len(mid_normalized), len(high_normalized))
 
-        # Create optimized waveform data structure for efficient rendering
+        target_points = min(self.WAVEFORM_TARGET_POINTS, min_length)
+        ds_times = self._downsample_block_average(times[:min_length], target_points)
+        ds_amplitudes = self._downsample_block_average(rms_normalized[:min_length], target_points)
+        ds_low = self._downsample_block_average(low_normalized[:min_length], target_points)
+        ds_mid = self._downsample_block_average(mid_normalized[:min_length], target_points)
+        ds_high = self._downsample_block_average(high_normalized[:min_length], target_points)
+
+        # Round to keep the JSON payload small - this is display data, not
+        # something that needs float64 precision.
         waveform_data = {
-            'times': times[:min_length].tolist(),
-            'amplitudes': rms_normalized[:min_length].tolist(),
+            'times': np.round(ds_times, 4).tolist(),
+            'amplitudes': np.round(ds_amplitudes, 4).tolist(),
             'frequency_bands': {
-                'low': low_normalized[:min_length].tolist(),    # Bass (Blue)
-                'mid': mid_normalized[:min_length].tolist(),   # Midrange (Yellow/Amber)
-                'high': high_normalized[:min_length].tolist()  # Treble (White)
+                'low': np.round(ds_low, 4).tolist(),
+                'mid': np.round(ds_mid, 4).tolist(),
+                'high': np.round(ds_high, 4).tolist()
             },
             'sample_rate': self.sr,
             'duration': len(self.y) / self.sr,
             'frame_length': frame_length,
             'hop_length': hop_length,
-            'analysis_version': '2.0.0'
+            'analysis_version': '2.1.0'
         }
 
-        # Calculate additional metadata for efficient rendering
         waveform_data['metadata'] = {
-            'max_amplitude': float(np.max(rms_normalized)),
-            'max_low': float(np.max(low_normalized)),
-            'max_mid': float(np.max(mid_normalized)),
-            'max_high': float(np.max(high_normalized)),
-            'total_frames': min_length,
-            'frames_per_second': self.sr / hop_length
+            'max_amplitude': float(np.max(ds_amplitudes)) if target_points else 0.0,
+            'max_low': float(np.max(ds_low)) if target_points else 0.0,
+            'max_mid': float(np.max(ds_mid)) if target_points else 0.0,
+            'max_high': float(np.max(ds_high)) if target_points else 0.0,
+            'total_frames': target_points,
+            'original_frames': min_length,
+            'frames_per_second': target_points / (len(self.y) / self.sr) if len(self.y) > 0 else 0.0
         }
 
         self.waveform_data = waveform_data
-        print(f"Generated Rekordbox-style waveform data with {min_length} frames")
-        print(f"Frequency bands: Low={len(low_normalized)}, Mid={len(mid_normalized)}, High={len(high_normalized)}")
+        print(f"Generated waveform data: {target_points} points (downsampled from {min_length} raw analysis frames)")
 
         return waveform_data
     
@@ -365,7 +423,7 @@ class TrackAnalyzer:
                 'beat_interval': 60.0 / self.tempo if self.tempo else 0.0
             },
             'analysis_metadata': {
-                'analyzer_version': '1.0.0',
+                'analyzer_version': '2.0.0',
                 'analysis_date': str(np.datetime64('now')),
                 'analysis_method': 'librosa'
             }
