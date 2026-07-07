@@ -1,40 +1,130 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import './AuthModal.css';
 
-const AuthModal = ({ isOpen, onClose, onSignIn, onSignUp }) => {
-  const [authMode, setAuthMode] = useState('signin');
+const getErrorMessage = (errorCode) => {
+  switch (errorCode) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists';
+    case 'auth/invalid-email':
+      return 'Invalid email address';
+    case 'auth/weak-password':
+      return 'Password is too weak';
+    case 'auth/user-not-found':
+      return 'No account found with this email';
+    case 'auth/wrong-password':
+      return 'Incorrect password';
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later';
+    case 'auth/popup-closed-by-user':
+      return 'Sign in was cancelled';
+    default:
+      return 'An error occurred. Please try again';
+  }
+};
 
-  const handleSignIn = (e) => {
-    e.preventDefault();
-    console.log('Sign in submitted');
-    onSignIn();
+const AuthModal = ({ isOpen, initialMode = 'signin', onClose }) => {
+  const [authMode, setAuthMode] = useState(initialMode);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { signup, signin, signInWithGoogle } = useAuth();
+
+  // Reset form/mode each time the modal is (re)opened.
+  useEffect(() => {
+    if (isOpen) {
+      setAuthMode(initialMode);
+      setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
+      setError('');
+    }
+  }, [isOpen, initialMode]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setError('');
   };
 
-  const handleSignUp = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    console.log('Sign up submitted');
-    onSignUp();
+    setError('');
+    setLoading(true);
+
+    try {
+      await signin(formData.email, formData.password);
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await signup(formData.email, formData.password, formData.fullName);
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await signInWithGoogle();
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="auth-modal-overlay">
-      <div className="auth-modal">
+    <div className="auth-modal-overlay" onClick={onClose}>
+      <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
         <div className="auth-modal-header">
           <h2 className="auth-modal-title">Welcome to Deckadence</h2>
           <button className="auth-close-btn" onClick={onClose}>×</button>
         </div>
-        
+
         <div className="auth-modal-content">
           <div className="form-tabs">
-            <button 
+            <button
               className={`tab ${authMode === 'signin' ? 'active' : ''}`}
               onClick={() => setAuthMode('signin')}
             >
               Sign In
             </button>
-            <button 
+            <button
               className={`tab ${authMode === 'signup' ? 'active' : ''}`}
               onClick={() => setAuthMode('signup')}
             >
@@ -45,23 +135,44 @@ const AuthModal = ({ isOpen, onClose, onSignIn, onSignUp }) => {
           {authMode === 'signin' && (
             <form className="auth-form" onSubmit={handleSignIn}>
               <div className="form-group">
-                <input 
-                  type="email" 
-                  placeholder="Email" 
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
                   className="form-input"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
               <div className="form-group">
-                <input 
-                  type="password" 
-                  placeholder="Password" 
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
                   className="form-input"
+                  value={formData.password}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
-              <button type="submit" className="auth-submit-btn">
-                Sign In
+              {error && <div className="error-message">{error}</div>}
+              <button type="submit" className="auth-submit-btn" disabled={loading}>
+                {loading ? 'Signing In...' : 'Sign In'}
+              </button>
+
+              <div className="divider">
+                <span>or</span>
+              </div>
+
+              <button
+                type="button"
+                className="google-signin-btn"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" />
+                Sign in with Google
               </button>
             </form>
           )}
@@ -69,39 +180,66 @@ const AuthModal = ({ isOpen, onClose, onSignIn, onSignUp }) => {
           {authMode === 'signup' && (
             <form className="auth-form" onSubmit={handleSignUp}>
               <div className="form-group">
-                <input 
-                  type="text" 
-                  placeholder="Full Name" 
+                <input
+                  type="text"
+                  name="fullName"
+                  placeholder="Full Name"
                   className="form-input"
+                  value={formData.fullName}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
               <div className="form-group">
-                <input 
-                  type="email" 
-                  placeholder="Email" 
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
                   className="form-input"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
               <div className="form-group">
-                <input 
-                  type="password" 
-                  placeholder="Password" 
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
                   className="form-input"
+                  value={formData.password}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
               <div className="form-group">
-                <input 
-                  type="password" 
-                  placeholder="Confirm Password" 
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm Password"
                   className="form-input"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
-              <button type="submit" className="auth-submit-btn">
-                Create Account
+              {error && <div className="error-message">{error}</div>}
+              <button type="submit" className="auth-submit-btn" disabled={loading}>
+                {loading ? 'Creating Account...' : 'Create Account'}
+              </button>
+
+              <div className="divider">
+                <span>or</span>
+              </div>
+
+              <button
+                type="button"
+                className="google-signin-btn"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" />
+                Sign up with Google
               </button>
             </form>
           )}
@@ -111,4 +249,4 @@ const AuthModal = ({ isOpen, onClose, onSignIn, onSignUp }) => {
   );
 };
 
-export default AuthModal; 
+export default AuthModal;

@@ -1,0 +1,158 @@
+.discover-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 3rem;
+}
+
+.discover-hero {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.discover-hero h1 {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 2.2rem;
+  color: #fff;
+  margin: 0 0 0.5rem;
+}
+
+.discover-subtitle {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin: 0 0 1.5rem;
+}
+
+.discover-guest-notice {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+}
+
+.discover-stats {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  margin-top: 1rem;
+}
+
+.discover-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.discover-stat-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #4ecdc4;
+}
+
+.discover-stat-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.discover-quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 3rem;
+}
+
+.discover-quick-link {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: #fff;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.discover-quick-link:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.discover-quick-link.disabled {
+  opacity: 0.6;
+}
+
+.discover-quick-link-icon {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.discover-quick-link h3 {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+
+.discover-quick-link p {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.discover-soon-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.discover-browse h2 {
+  font-family: 'Orbitron', monospace;
+  color: #fff;
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+
+.discover-browse > p {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 1.5rem;
+}
+
+.discover-browse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
+.discover-browse-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.discover-browse-item h3 {
+  font-family: 'Rajdhani', sans-serif;
+  color: #fff;
+  margin: 0 0 0.35rem;
+}
+
+.discover-browse-item p {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
+  margin: 0;
+}

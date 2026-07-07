@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { TrackService } from '../services/trackService';
-import './AudioUploader.css';
+import './TrackAnalysisPage.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
+const TrackAnalysisPage = () => {
   const [uploadState, setUploadState] = useState('idle'); // idle, uploading, analyzing, complete, error
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -13,6 +14,7 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, available, unavailable
   const [savingToCloud, setSavingToCloud] = useState(false);
+  const [savedTrack, setSavedTrack] = useState(null);
   const fileInputRef = useRef(null);
   const { currentUser } = useAuth();
 
@@ -35,7 +37,7 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
         setBackendStatus('unavailable');
       }
     };
-    
+
     checkBackendStatus();
   }, []);
 
@@ -77,62 +79,62 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
 
   const analyzeTrack = async () => {
     setUploadState('uploading');
-    
+
     try {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', selectedFile);
-      
+
       // Upload progress simulation
       for (let i = 0; i <= 50; i += 10) {
         setUploadProgress(i);
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
+
       setUploadState('analyzing');
-      
+
       // Call the backend API
       try {
         const response = await fetch(`${API_BASE_URL}/api/analyze`, {
           method: 'POST',
           body: formData,
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || 'Analysis failed');
         }
-        
+
         const analysisData = await response.json();
-        
+
         // Handle new cloud-based response structure
         let result;
         if (analysisData.success && analysisData.track) {
           // New cloud-based structure
           const track = analysisData.track;
-                      // Convert beatGrid format to expected format (array of time values)
-            const beatgrid = track.beatGrid ? track.beatGrid.map(beat => beat.time / 1000) : []; // Convert milliseconds to seconds
-            
-            result = {
-              fileName: track.title || selectedFile.name,
-              file: selectedFile,
-              fileSize: selectedFile.size,
-              duration: track.duration,
-              bpm: track.bpm,
-              key: track.key,
-              mode: track.key.includes('m') ? 'minor' : 'major', // Extract mode from key
-              camelot: track.camelotKey,
-              beatgrid: beatgrid, // Converted beatGrid
-              waveformData: track.waveformData || {},
-              analysisDate: track.analysisMetadata?.analysisDate || new Date().toISOString(),
-              confidence: track.analysisMetadata?.confidence || {
-                bpm: 0.95,
-                key: 0.85
-              },
-              trackID: track.trackID,
-              uploaderID: track.uploaderID,
-              status: track.status
-            };
+          // Convert beatGrid format to expected format (array of time values)
+          const beatgrid = track.beatGrid ? track.beatGrid.map(beat => beat.time / 1000) : []; // Convert milliseconds to seconds
+
+          result = {
+            fileName: track.title || selectedFile.name,
+            file: selectedFile,
+            fileSize: selectedFile.size,
+            duration: track.duration,
+            bpm: track.bpm,
+            key: track.key,
+            mode: track.key.includes('m') ? 'minor' : 'major', // Extract mode from key
+            camelot: track.camelotKey,
+            beatgrid: beatgrid, // Converted beatGrid
+            waveformData: track.waveformData || {},
+            analysisDate: track.analysisMetadata?.analysisDate || new Date().toISOString(),
+            confidence: track.analysisMetadata?.confidence || {
+              bpm: 0.95,
+              key: 0.85
+            },
+            trackID: track.trackID,
+            uploaderID: track.uploaderID,
+            status: track.status
+          };
         } else {
           // Fallback to old structure if needed
           result = {
@@ -140,19 +142,16 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
             file: selectedFile
           };
         }
-        
-        const fileToUpload = result.file;
-        const { file, ...trackData } = result;
 
         setUploadProgress(100);
-        setAnalysisResult(trackData);
+        setAnalysisResult(result);
         setUploadState('complete');
       } catch (apiError) {
         console.log('Backend API not available, using fallback analysis:', apiError);
-        
+
         // Fallback to mock analysis if backend is not available
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const fallbackResult = {
           fileName: selectedFile.name,
           file: selectedFile,
@@ -173,12 +172,12 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
           uploaderID: 'fallback_user',
           status: 'ready'
         };
-        
+
         setUploadProgress(100);
         setAnalysisResult(fallbackResult);
         setUploadState('complete');
       }
-      
+
     } catch (error) {
       console.error('Analysis error:', error);
       setErrorMessage(error.message || 'Analysis failed. Please try again.');
@@ -191,11 +190,11 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
     const bpm = 88;
     const beatInterval = 60 / bpm;
     const duration = 177; // 2:57 in seconds
-    
+
     for (let time = 0; time < duration; time += beatInterval) {
       beats.push(time);
     }
-    
+
     return beats;
   };
 
@@ -204,11 +203,11 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
     const times = [];
     const amplitudes = [];
     const colors = [];
-    
+
     for (let i = 0; i < points; i++) {
       times.push(i * 0.1);
       amplitudes.push(Math.random() * 0.8 + 0.1);
-      
+
       // Generate frequency-based colors
       const freq = Math.random();
       if (freq < 0.33) {
@@ -219,13 +218,13 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
         colors.push([0.0, 1.0 - (freq - 0.66) * 3, 1.0]); // Blue to cyan
       }
     }
-    
+
     return { times, amplitudes, colors };
   };
 
   const handleAnalyze = async () => {
     if (!selectedFile) return;
-    
+
     try {
       await analyzeTrack();
     } catch (error) {
@@ -236,23 +235,23 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
 
   const handleSaveTrack = async () => {
     if (!analysisResult) return;
-    
+
     if (!currentUser) {
       setErrorMessage('You must be logged in to save tracks to your library');
       return;
     }
-    
+
     setSavingToCloud(true);
     setErrorMessage('');
-    
+
     try {
       // Upload audio file to Firebase Storage
       const { storagePath, downloadURL } = await TrackService.uploadFile(
-        selectedFile, 
-        currentUser.uid, 
+        selectedFile,
+        currentUser.uid,
         selectedFile.name
       );
-      
+
       // Create clean track data without the File object
       const cleanTrackData = {
         ...analysisResult,
@@ -261,18 +260,13 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
         fileName: selectedFile.name,
         fileSize: selectedFile.size
       };
-      
+
       // Remove the File object as it can't be serialized
       delete cleanTrackData.file;
-      
+
       // Save track to Firestore
-      const savedTrack = await TrackService.saveTrack(cleanTrackData, currentUser.uid);
-      
-      if (onTrackAnalyzed) {
-        onTrackAnalyzed(savedTrack);
-      }
-      
-      onClose();
+      const saved = await TrackService.saveTrack(cleanTrackData, currentUser.uid);
+      setSavedTrack(saved);
     } catch (error) {
       console.error('Error saving track:', error);
       setErrorMessage('Failed to save track to cloud. Please try again.');
@@ -284,7 +278,9 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
   const handleRetry = () => {
     setUploadState('idle');
     setUploadProgress(0);
+    setSelectedFile(null);
     setAnalysisResult(null);
+    setSavedTrack(null);
     setErrorMessage('');
   };
 
@@ -302,186 +298,190 @@ const AudioUploader = ({ isOpen, onTrackAnalyzed, onClose }) => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="audio-uploader-overlay">
-      <div className="audio-uploader-modal">
-        <div className="uploader-header">
-          <div className="header-left">
-            <h2>Upload & Analyze Track</h2>
-            <div className="backend-status">
-              {backendStatus === 'checking' && <span className="status-checking">Checking backend...</span>}
-              {backendStatus === 'available' && <span className="status-available">✓ Backend available</span>}
-              {backendStatus === 'unavailable' && <span className="status-unavailable">⚠ Using fallback analysis</span>}
-            </div>
-          </div>
-          <button className="close-btn" onClick={onClose}>×</button>
+    <div className="track-analysis-page">
+      <div className="analysis-page-header">
+        <h1>Track Analysis</h1>
+        <div className="backend-status">
+          {backendStatus === 'checking' && <span className="status-checking">Checking backend...</span>}
+          {backendStatus === 'available' && <span className="status-available">✓ Backend available</span>}
+          {backendStatus === 'unavailable' && <span className="status-unavailable">⚠ Using fallback analysis</span>}
         </div>
+      </div>
 
-        <div className="uploader-content">
-          {uploadState === 'idle' && (
-            <div className="upload-section">
-              <div 
-                className="drop-zone"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="drop-zone-content">
-                  <div className="upload-icon">🎵</div>
-                  <h3>Drop your audio file here</h3>
-                  <p>or click to browse</p>
-                  <p className="supported-formats">
-                    Supported formats: {supportedFormats.join(', ')}
-                  </p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={supportedFormats.map(f => `.${f}`).join(',')}
-                  onChange={handleFileSelect}
-                  style={{ display: 'none' }}
-                />
+      <div className="analysis-page-content">
+        {uploadState === 'idle' && (
+          <div className="upload-section">
+            <div
+              className="drop-zone"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="drop-zone-content">
+                <div className="upload-icon">🎵</div>
+                <h3>Drop your audio file here</h3>
+                <p>or click to browse</p>
+                <p className="supported-formats">
+                  Supported formats: {supportedFormats.join(', ')}
+                </p>
               </div>
-
-              {selectedFile && (
-                <div className="selected-file">
-                  <div className="file-info">
-                    <div className="file-icon">📁</div>
-                    <div className="file-details">
-                      <h4>{selectedFile.name}</h4>
-                      <p>{formatFileSize(selectedFile.size)}</p>
-                    </div>
-                  </div>
-                  <button className="analyze-btn" onClick={handleAnalyze}>
-                    Analyze Track
-                  </button>
-                </div>
-              )}
-
-              {errorMessage && (
-                <div className="error-message">
-                  {errorMessage}
-                </div>
-              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={supportedFormats.map(f => `.${f}`).join(',')}
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
             </div>
-          )}
 
-          {(uploadState === 'uploading' || uploadState === 'analyzing') && (
-            <div className="analysis-progress">
-              <div className="progress-icon">
-                {uploadState === 'uploading' ? '📤' : '🔍'}
+            {selectedFile && (
+              <div className="selected-file">
+                <div className="file-info">
+                  <div className="file-icon">📁</div>
+                  <div className="file-details">
+                    <h4>{selectedFile.name}</h4>
+                    <p>{formatFileSize(selectedFile.size)}</p>
+                  </div>
+                </div>
+                <button className="analyze-btn" onClick={handleAnalyze}>
+                  Analyze Track
+                </button>
               </div>
-              <h3>
-                {uploadState === 'uploading' ? 'Uploading...' : 'Analyzing...'}
-              </h3>
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
+            )}
+
+            {errorMessage && (
+              <div className="error-message">
+                {errorMessage}
               </div>
-              <p>{uploadProgress}% complete</p>
+            )}
+          </div>
+        )}
+
+        {(uploadState === 'uploading' || uploadState === 'analyzing') && (
+          <div className="analysis-progress">
+            <div className="progress-icon">
+              {uploadState === 'uploading' ? '📤' : '🔍'}
             </div>
-          )}
+            <h3>
+              {uploadState === 'uploading' ? 'Uploading...' : 'Analyzing...'}
+            </h3>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+            <p>{uploadProgress}% complete</p>
+          </div>
+        )}
 
-          {uploadState === 'complete' && analysisResult && (
-            <div className="analysis-results">
-              <div className="results-header">
-                <div className="success-icon">✅</div>
-                <h3>Analysis Complete!</h3>
+        {uploadState === 'complete' && analysisResult && (
+          <div className="analysis-results">
+            <div className="results-header">
+              <div className="success-icon">✅</div>
+              <h3>Analysis Complete!</h3>
+            </div>
+
+            <div className="track-info">
+              <div className="info-grid">
+                <div className="info-item">
+                  <label>Track Name</label>
+                  <span>{analysisResult.fileName || 'Unknown'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Duration</label>
+                  <span>{formatDuration(analysisResult.duration || 0)}</span>
+                </div>
+                <div className="info-item">
+                  <label>BPM</label>
+                  <span>{analysisResult.bpm || 'Unknown'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Key</label>
+                  <span>{analysisResult.key || 'Unknown'} {analysisResult.mode || ''}</span>
+                </div>
+                <div className="info-item">
+                  <label>Camelot</label>
+                  <span>{analysisResult.camelot || 'Unknown'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Beats</label>
+                  <span>{analysisResult.beatgrid ? analysisResult.beatgrid.length : 0}</span>
+                </div>
               </div>
 
-              <div className="track-info">
-                <div className="info-grid">
-                  <div className="info-item">
-                    <label>Track Name</label>
-                    <span>{analysisResult.fileName || 'Unknown'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Duration</label>
-                    <span>{formatDuration(analysisResult.duration || 0)}</span>
-                  </div>
-                  <div className="info-item">
+              <div className="confidence-scores">
+                <h4>Confidence Scores</h4>
+                <div className="confidence-bars">
+                  <div className="confidence-item">
                     <label>BPM</label>
-                    <span>{analysisResult.bpm || 'Unknown'}</span>
+                    <div className="confidence-bar">
+                      <div
+                        className="confidence-fill"
+                        style={{ width: `${(analysisResult.confidence?.bpm || 0.95) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span>{Math.round((analysisResult.confidence?.bpm || 0.95) * 100)}%</span>
                   </div>
-                  <div className="info-item">
+                  <div className="confidence-item">
                     <label>Key</label>
-                    <span>{analysisResult.key || 'Unknown'} {analysisResult.mode || ''}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Camelot</label>
-                    <span>{analysisResult.camelot || 'Unknown'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Beats</label>
-                    <span>{analysisResult.beatgrid ? analysisResult.beatgrid.length : 0}</span>
-                  </div>
-                </div>
-
-                <div className="confidence-scores">
-                  <h4>Confidence Scores</h4>
-                  <div className="confidence-bars">
-                    <div className="confidence-item">
-                      <label>BPM</label>
-                      <div className="confidence-bar">
-                        <div 
-                          className="confidence-fill"
-                          style={{ width: `${(analysisResult.confidence?.bpm || 0.95) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span>{Math.round((analysisResult.confidence?.bpm || 0.95) * 100)}%</span>
+                    <div className="confidence-bar">
+                      <div
+                        className="confidence-fill"
+                        style={{ width: `${(analysisResult.confidence?.key || 0.85) * 100}%` }}
+                      ></div>
                     </div>
-                    <div className="confidence-item">
-                      <label>Key</label>
-                      <div className="confidence-bar">
-                        <div 
-                          className="confidence-fill"
-                          style={{ width: `${(analysisResult.confidence?.key || 0.85) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span>{Math.round((analysisResult.confidence?.key || 0.85) * 100)}%</span>
-                    </div>
+                    <span>{Math.round((analysisResult.confidence?.key || 0.85) * 100)}%</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="action-buttons">
-                <button 
-                  className="save-track-btn" 
+            <div className="action-buttons">
+              {savedTrack ? (
+                <Link to="/library" className="save-track-btn view-library-link">
+                  View in Library →
+                </Link>
+              ) : (
+                <button
+                  className="save-track-btn"
                   onClick={handleSaveTrack}
                   disabled={savingToCloud || !currentUser}
                 >
                   {savingToCloud ? 'Saving to Cloud...' : 'Save to Library'}
                 </button>
-                <button className="retry-btn" onClick={handleRetry}>
-                  Analyze Another Track
-                </button>
-              </div>
-              {!currentUser && (
-                <div className="login-notice">
-                  <p>💡 Sign in to save tracks to your cloud library</p>
-                </div>
               )}
-            </div>
-          )}
-
-          {uploadState === 'error' && (
-            <div className="error-section">
-              <div className="error-icon">❌</div>
-              <h3>Analysis Failed</h3>
-              <p>{errorMessage || 'An error occurred during analysis. Please try again.'}</p>
               <button className="retry-btn" onClick={handleRetry}>
-                Try Again
+                Analyze Another Track
               </button>
             </div>
-          )}
-        </div>
+            {!currentUser && (
+              <div className="login-notice">
+                <p>💡 Sign in to save tracks to your cloud library</p>
+              </div>
+            )}
+            {errorMessage && (
+              <div className="error-message">
+                {errorMessage}
+              </div>
+            )}
+          </div>
+        )}
+
+        {uploadState === 'error' && (
+          <div className="error-section">
+            <div className="error-icon">❌</div>
+            <h3>Analysis Failed</h3>
+            <p>{errorMessage || 'An error occurred during analysis. Please try again.'}</p>
+            <button className="retry-btn" onClick={handleRetry}>
+              Try Again
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default AudioUploader; 
+export default TrackAnalysisPage;

@@ -1,0 +1,39 @@
+.coming-soon {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+}
+
+.coming-soon-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.coming-soon h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.8rem;
+  color: #fff;
+  margin: 0 0 0.75rem;
+}
+
+.coming-soon p {
+  font-family: 'Rajdhani', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.1rem;
+  margin: 0 0 1.5rem;
+}
+
+.coming-soon-link {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  color: #4ecdc4;
+  text-decoration: none;
+}
+
+.coming-soon-link:hover {
+  text-decoration: underline;
+}
