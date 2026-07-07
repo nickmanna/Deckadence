@@ -172,6 +172,20 @@ class TrackAnalyzer:
             units='frames'
         )
 
+        # trim=False's tradeoff: beat_track can hallucinate one extra beat
+        # before the first real onset, purely to extrapolate a consistent
+        # grid back to the start of the track. Verified on real tracks:
+        # when this happens, that leading beat has ~zero actual onset
+        # support (unlike every other beat, real or quiet, which has some).
+        # Only ever drop the single leading beat, and only when it's
+        # essentially unsupported - a genuinely strong beat right at time
+        # zero (e.g. a track that opens cold on a hit) must survive this.
+        if len(beat_frames) > 2:
+            beat_strengths = onset_env[np.clip(beat_frames, 0, len(onset_env) - 1)]
+            median_strength = np.median(beat_strengths)
+            if median_strength > 0 and beat_strengths[0] < 0.05 * median_strength:
+                beat_frames = beat_frames[1:]
+
         raw_beats = librosa.frames_to_time(beat_frames, sr=self.sr, hop_length=512)
         self.beats = self._clean_beat_times(raw_beats)
 
