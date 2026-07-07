@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import './Waveform.css';
 
-// Rekordbox-style 3-band coloring: blue=bass, orange=mid, white=treble,
+// Rekordbox-style 3-band coloring: blue=bass, teal=mid, pink/red=treble,
 // blended per point by each band's relative energy. This is the only
-// waveform style in the app now - it's what real Rekordbox looks like,
-// and it matches the small waveform thumbnail used in the track library.
-const LOW_COLOR = [0x00, 0xAE, 0xEF];
-const MID_COLOR = [0xFF, 0xAA, 0x00];
-const HIGH_COLOR = [0xFF, 0xFF, 0xFF];
+// waveform style in the app now - it matches the small waveform thumbnail
+// used in the track library.
+const LOW_COLOR = [0x29, 0x79, 0xFF];
+const MID_COLOR = [0x00, 0xE0, 0xB8];
+const HIGH_COLOR = [0xFF, 0x3D, 0x71];
 const DEFAULT_COLOR = 'rgb(78, 205, 196)';
 
 const blendBandColor = (low, mid, high) => {

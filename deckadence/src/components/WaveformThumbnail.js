@@ -8,9 +8,9 @@ const BAR_COUNT = 40;
 // Same low/mid/high color convention as the full DJ-view waveform
 // (Waveform.js) so a track looks visually consistent between the table
 // thumbnail and the player.
-const LOW_COLOR = [0x00, 0xAE, 0xEF];
-const MID_COLOR = [0xFF, 0xAA, 0x00];
-const HIGH_COLOR = [0xFF, 0xFF, 0xFF];
+const LOW_COLOR = [0x29, 0x79, 0xFF];
+const MID_COLOR = [0x00, 0xE0, 0xB8];
+const HIGH_COLOR = [0xFF, 0x3D, 0x71];
 
 // Downsample/upsample an array to exactly `count` values by bucket-averaging
 // so the thumbnail always renders the same number of bars regardless of how
