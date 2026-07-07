@@ -97,3 +97,15 @@ jobs:
           service: ${{ vars.CLOUD_RUN_SERVICE }}
           region: ${{ vars.GCP_REGION }}
           image: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/backend:${{ github.sha }}
+
+      - name: Allow public invocation
+        # The frontend calls this API directly and unauthenticated (same as
+        # it always called http://localhost:5000) - Cloud Run services
+        # default to private, so this keeps that existing behavior instead
+        # of silently breaking uploads. Idempotent: safe to run every deploy.
+        run: |
+          gcloud run services add-iam-policy-binding "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet

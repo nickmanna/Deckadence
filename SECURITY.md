@@ -44,10 +44,16 @@ this pass — only configuration handling and repo hygiene.
    and old hardcoded API key are still recoverable from git history. Rewriting
    history (`git filter-repo` / BFG) requires a force-push and coordination
    with anyone else using this repo — do this deliberately, not casually.
-4. **CORS is fully open in the backend.** `main.py` calls `CORS(app)` with
-   no origin restriction, so any website can call the Flask API. Not changed
-   here (functionality-affecting), but should be scoped to the deployed
-   frontend origin(s) before this goes to production.
+4. **CORS is fully open in the backend, and it's now live on the public
+   internet.** `main.py` calls `CORS(app)` with no origin restriction, and
+   the Cloud Run service is deployed with public (unauthenticated)
+   invocation enabled (`deploy.yml`'s "Allow public invocation" step) so the
+   deployed frontend can reach it — same trust model as the original local
+   `http://localhost:5000` setup, just no longer confined to localhost. Not
+   changed here (functionality-affecting), but any website can now call
+   `/api/analyze` and consume compute/storage; CORS should be scoped to the
+   deployed frontend origin(s), and consider rate limiting or requiring
+   Firebase Auth-verified requests before this sees real traffic.
 5. **Review `firestore.rules` / `storage.rules`** periodically — they
    currently scope all reads/writes to `request.auth.uid` matching the
    resource owner, which is a reasonable baseline, but wasn't re-audited as
