@@ -20,6 +20,7 @@
     "indexes": "firestore.indexes.json"
   },
   "storage": {
+    "bucket": "deckadence-2646d.firebasestorage.app",
     "rules": "storage.rules"
   }
 }
