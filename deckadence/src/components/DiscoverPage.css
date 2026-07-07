@@ -67,18 +67,18 @@
 
 .discover-quick-link {
   position: relative;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  background: #161618;
+  border: 1px solid #2a2a2e;
+  border-radius: 10px;
   padding: 1.5rem;
   text-decoration: none;
   color: #fff;
-  transition: transform 0.2s ease, background 0.2s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .discover-quick-link:hover {
-  transform: translateY(-3px);
-  background: rgba(255, 255, 255, 0.08);
+  background: #1c1c20;
+  border-color: #3a3a40;
 }
 
 .discover-quick-link.disabled {
@@ -113,9 +113,9 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.2rem 0.5rem;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  background: #232326;
+  color: #9a9aa0;
 }
 
 .discover-browse h2 {
@@ -138,9 +138,9 @@
 }
 
 .discover-browse-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
+  background: #161618;
+  border: 1px solid #2a2a2e;
+  border-radius: 10px;
   padding: 1.5rem;
 }
 

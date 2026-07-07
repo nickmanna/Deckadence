@@ -1,5 +1,6 @@
 .footer {
-  background: linear-gradient(135deg, #000000 0%, #202020 100%);
+  background: #111113;
+  border-top: 1px solid #232326;
   color: white;
   padding: 40px 0 20px 0;
   margin-top: auto;
@@ -65,16 +66,17 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  background: #1e1e22;
+  border: 1px solid #333338;
   border-radius: 50%;
-  color: #202020;
+  color: #4ecdc4;
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .social-links a:hover {
-  color: white;
-  transform: translateY(-2px);
+  background: #26262b;
+  border-color: #4ecdc4;
 }
 
 .social-links i {

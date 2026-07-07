@@ -32,8 +32,8 @@
 
 .library-search-input,
 .library-filter-select {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #1e1e22;
+  border: 1px solid #333338;
   border-radius: 8px;
   padding: 0.6rem 0.9rem;
   color: #fff;
@@ -47,7 +47,7 @@
 }
 
 .library-search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: #6a6a70;
 }
 
 .library-search-input:focus,
@@ -58,27 +58,28 @@
 
 .library-table-wrapper {
   overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border: 1px solid #2a2a2e;
+  border-radius: 10px;
 }
 
 .library-table {
   width: 100%;
   border-collapse: collapse;
   font-family: 'Rajdhani', sans-serif;
+  background: #121214;
 }
 
 .library-table th {
   text-align: left;
   padding: 0.9rem 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.6);
+  background: #161618;
+  color: #8a8a90;
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #2a2a2e;
 }
 
 .library-table th.sortable-col {
@@ -87,7 +88,7 @@
 }
 
 .library-table th.sortable-col:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: #d0d0d4;
 }
 
 .sort-indicator {
@@ -97,12 +98,12 @@
 .library-table td {
   padding: 0.7rem 1rem;
   color: #fff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #202024;
   white-space: nowrap;
 }
 
 .library-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: #191a1c;
 }
 
 .title-col {
@@ -130,19 +131,20 @@
 }
 
 .preview-btn {
-  background: rgba(78, 205, 196, 0.15);
+  background: transparent;
   color: #4ecdc4;
-  border: 1px solid rgba(78, 205, 196, 0.3);
+  border: 1px solid #333338;
   border-radius: 6px;
   padding: 0.4rem 0.8rem;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .preview-btn:hover {
-  background: rgba(78, 205, 196, 0.25);
+  background: #1c1c20;
+  border-color: #4ecdc4;
 }
 
 .library-loading {
@@ -155,8 +157,9 @@
 .library-empty-state {
   text-align: center;
   padding: 4rem 1.5rem;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: #161618;
+  border: 1px solid #2a2a2e;
+  border-radius: 10px;
 }
 
 .library-empty-icon {
@@ -179,8 +182,8 @@
 
 .library-empty-cta {
   display: inline-block;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-  color: #202020;
+  background: #4ecdc4;
+  color: #111113;
   text-decoration: none;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
@@ -189,7 +192,7 @@
 }
 
 .library-empty-cta:hover {
-  color: #fff;
+  background: #5fd8cf;
 }
 
 @media (max-width: 768px) {

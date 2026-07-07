@@ -44,18 +44,18 @@
 
 /* Drop Zone */
 .drop-zone {
-  border: 2px dashed #00AEEF;
+  border: 2px dashed #333338;
   border-radius: 8px;
   padding: 40px 20px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  background: rgba(0, 174, 239, 0.05);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  background: #161618;
 }
 
 .drop-zone:hover {
-  border-color: #fff;
-  background: rgba(0, 174, 239, 0.1);
+  border-color: #00AEEF;
+  background: #17191c;
 }
 
 .drop-zone-content {
@@ -117,7 +117,7 @@
 }
 
 .analyze-btn {
-  background: linear-gradient(135deg, #00AEEF, #0088CC);
+  background: #00AEEF;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -130,7 +130,7 @@
 }
 
 .analyze-btn:hover {
-  background: linear-gradient(135deg, #0088CC, #006699);
+  background: #0098d4;
   transform: translateY(-1px);
 }
 
@@ -162,7 +162,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00AEEF, #0088CC);
+  background: #00AEEF;
   transition: width 0.3s ease;
 }
 
@@ -261,7 +261,7 @@
 
 .confidence-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00AEEF, #0088CC);
+  background: #00AEEF;
   transition: width 0.3s ease;
 }
 
@@ -279,7 +279,7 @@
 
 .save-track-btn {
   flex: 1;
-  background: linear-gradient(135deg, #00AEEF, #0088CC);
+  background: #00AEEF;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -291,7 +291,7 @@
 }
 
 .save-track-btn:hover {
-  background: linear-gradient(135deg, #0088CC, #006699);
+  background: #0098d4;
   transform: translateY(-1px);
 }
 
