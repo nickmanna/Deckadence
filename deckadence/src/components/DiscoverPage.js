@@ -6,10 +6,10 @@ import { FEATURES } from '../config/features';
 import './DiscoverPage.css';
 
 const QUICK_LINKS = [
-  { to: '/analyze', icon: '📊', title: 'Track Analysis', description: 'Upload a track and get BPM, key, and beatgrid.' },
-  { to: '/library', icon: '📚', title: 'Track Library', description: 'Browse and preview your analyzed tracks.' },
-  { to: '/green-room', icon: '🎹', title: 'Green Room', description: 'Practice mixing in the studio.', flag: 'greenRoom' },
-  { to: '/games', icon: '🕹️', title: 'Games', description: 'Test your DJ skills.', flag: 'games' }
+  { to: '/analyze', title: 'Track Analysis', description: 'Upload a track and get BPM, key, and beatgrid.' },
+  { to: '/library', title: 'Track Library', description: 'Browse and preview your analyzed tracks.' },
+  { to: '/green-room', title: 'Green Room', description: 'Practice mixing in the studio.', flag: 'greenRoom' },
+  { to: '/games', title: 'Games', description: 'Test your DJ skills.', flag: 'games' }
 ];
 
 const DiscoverPage = () => {
@@ -76,10 +76,11 @@ const DiscoverPage = () => {
               to={link.to}
               className={`discover-quick-link${disabled ? ' disabled' : ''}`}
             >
-              <span className="discover-quick-link-icon">{link.icon}</span>
-              <h3>{link.title}</h3>
+              <div className="discover-quick-link-header">
+                <h3>{link.title}</h3>
+                {disabled && <span className="discover-soon-badge">Coming Soon</span>}
+              </div>
               <p>{link.description}</p>
-              {disabled && <span className="discover-soon-badge">Coming Soon</span>}
             </Link>
           );
         })}

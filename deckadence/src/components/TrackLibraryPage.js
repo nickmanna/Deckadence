@@ -180,7 +180,6 @@ const TrackLibraryPage = () => {
     return (
       <div className="track-library-page">
         <div className="library-empty-state">
-          <div className="library-empty-icon">🔒</div>
           <h2>Sign in to view your track library</h2>
           <p>Analyzed tracks you save are stored under your account.</p>
         </div>
@@ -229,7 +228,6 @@ const TrackLibraryPage = () => {
         <div className="library-loading">Loading tracks...</div>
       ) : filteredTracks.length === 0 ? (
         <div className="library-empty-state">
-          <div className="library-empty-icon">🎵</div>
           <h2>No tracks yet</h2>
           <p>Analyze your first track to start building your library.</p>
           <Link to="/analyze" className="library-empty-cta">Analyze a Track</Link>

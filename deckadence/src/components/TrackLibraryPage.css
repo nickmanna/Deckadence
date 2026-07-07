@@ -162,11 +162,6 @@
   border-radius: 10px;
 }
 
-.library-empty-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
 .library-empty-state h2 {
   font-family: 'Orbitron', monospace;
   color: #fff;

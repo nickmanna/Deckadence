@@ -62,11 +62,6 @@
   color: #fff;
 }
 
-.upload-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
 .drop-zone h3 {
   margin: 0 0 8px 0;
   font-size: 1.2rem;
@@ -97,11 +92,6 @@
   display: flex;
   align-items: center;
   margin-bottom: 16px;
-}
-
-.file-icon {
-  font-size: 24px;
-  margin-right: 12px;
 }
 
 .file-details h4 {
@@ -140,11 +130,6 @@
   padding: 40px 20px;
 }
 
-.progress-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
 .analysis-progress h3 {
   margin: 0 0 20px 0;
   color: #fff;
@@ -180,11 +165,6 @@
   display: flex;
   align-items: center;
   margin-bottom: 24px;
-}
-
-.success-icon {
-  font-size: 32px;
-  margin-right: 12px;
 }
 
 .results-header h3 {
@@ -340,11 +320,6 @@
   text-align: center;
   padding: 40px 20px;
   color: #fff;
-}
-
-.error-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
 }
 
 .error-section h3 {

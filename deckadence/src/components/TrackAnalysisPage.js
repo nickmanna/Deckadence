@@ -304,8 +304,8 @@ const TrackAnalysisPage = () => {
         <h1>Track Analysis</h1>
         <div className="backend-status">
           {backendStatus === 'checking' && <span className="status-checking">Checking backend...</span>}
-          {backendStatus === 'available' && <span className="status-available">✓ Backend available</span>}
-          {backendStatus === 'unavailable' && <span className="status-unavailable">⚠ Using fallback analysis</span>}
+          {backendStatus === 'available' && <span className="status-available">Backend available</span>}
+          {backendStatus === 'unavailable' && <span className="status-unavailable">Using fallback analysis</span>}
         </div>
       </div>
 
@@ -319,7 +319,6 @@ const TrackAnalysisPage = () => {
               onClick={() => fileInputRef.current?.click()}
             >
               <div className="drop-zone-content">
-                <div className="upload-icon">🎵</div>
                 <h3>Drop your audio file here</h3>
                 <p>or click to browse</p>
                 <p className="supported-formats">
@@ -338,7 +337,6 @@ const TrackAnalysisPage = () => {
             {selectedFile && (
               <div className="selected-file">
                 <div className="file-info">
-                  <div className="file-icon">📁</div>
                   <div className="file-details">
                     <h4>{selectedFile.name}</h4>
                     <p>{formatFileSize(selectedFile.size)}</p>
@@ -360,9 +358,6 @@ const TrackAnalysisPage = () => {
 
         {(uploadState === 'uploading' || uploadState === 'analyzing') && (
           <div className="analysis-progress">
-            <div className="progress-icon">
-              {uploadState === 'uploading' ? '📤' : '🔍'}
-            </div>
             <h3>
               {uploadState === 'uploading' ? 'Uploading...' : 'Analyzing...'}
             </h3>
@@ -379,7 +374,6 @@ const TrackAnalysisPage = () => {
         {uploadState === 'complete' && analysisResult && (
           <div className="analysis-results">
             <div className="results-header">
-              <div className="success-icon">✅</div>
               <h3>Analysis Complete!</h3>
             </div>
 
@@ -458,7 +452,7 @@ const TrackAnalysisPage = () => {
             </div>
             {!currentUser && (
               <div className="login-notice">
-                <p>💡 Sign in to save tracks to your cloud library</p>
+                <p>Sign in to save tracks to your cloud library</p>
               </div>
             )}
             {errorMessage && (
@@ -471,7 +465,6 @@ const TrackAnalysisPage = () => {
 
         {uploadState === 'error' && (
           <div className="error-section">
-            <div className="error-icon">❌</div>
             <h3>Analysis Failed</h3>
             <p>{errorMessage || 'An error occurred during analysis. Please try again.'}</p>
             <button className="retry-btn" onClick={handleRetry}>

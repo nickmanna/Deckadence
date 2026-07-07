@@ -35,7 +35,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.7rem 0.75rem;
+  padding: 0.7rem 1rem;
   border-radius: 6px;
   border-left: 2px solid transparent;
   color: #a0a0a6;
@@ -66,12 +66,6 @@
 .sidebar-nav-item.disabled:hover {
   background: #161618;
   color: #6a6a70;
-}
-
-.sidebar-nav-icon {
-  font-size: 1.1rem;
-  width: 1.4rem;
-  text-align: center;
 }
 
 .sidebar-nav-label {

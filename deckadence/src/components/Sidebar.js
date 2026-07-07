@@ -6,11 +6,11 @@ import AuthModal from './AuthModal';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Discover', icon: '🧭', end: true },
-  { to: '/library', label: 'Track Library', icon: '📚' },
-  { to: '/analyze', label: 'Track Analysis', icon: '📊' },
-  { to: '/green-room', label: 'Green Room', icon: '🎹', flag: 'greenRoom' },
-  { to: '/games', label: 'Games', icon: '🕹️', flag: 'games' }
+  { to: '/', label: 'Discover', end: true },
+  { to: '/library', label: 'Track Library' },
+  { to: '/analyze', label: 'Track Analysis' },
+  { to: '/green-room', label: 'Green Room', flag: 'greenRoom' },
+  { to: '/games', label: 'Games', flag: 'games' }
 ];
 
 const Sidebar = () => {
@@ -44,7 +44,6 @@ const Sidebar = () => {
                   `sidebar-nav-item${isActive ? ' active' : ''}${disabled ? ' disabled' : ''}`
                 }
               >
-                <span className="sidebar-nav-icon">{item.icon}</span>
                 <span className="sidebar-nav-label">{item.label}</span>
                 {disabled && <span className="sidebar-soon-badge">Soon</span>}
               </NavLink>
