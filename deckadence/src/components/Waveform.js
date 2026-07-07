@@ -69,6 +69,13 @@ const Waveform = ({
   }, [track?.waveformData]);
 
   const beatgrid = useMemo(() => track?.beatgrid || track?.beatGrid || [], [track?.beatgrid, track?.beatGrid]);
+  // Which beat is actually bar 1 - not always beat 0. A track can open on
+  // a long intro with no real bass/percussion content, where beat_track
+  // still fills in a tempo-consistent grid (useful for DJs cueing through
+  // a quiet intro) but that leading stretch carries no evidence of where
+  // the real downbeat falls, so the backend anchors this on the beat the
+  // track's actual rhythmic content starts on instead.
+  const downbeatOffset = track?.downbeatOffset || 0;
 
   const drawBeatgrid = useCallback((ctx, width, height, timeToX) => {
     if (!showBeatgrid || beatgrid.length === 0) return;
@@ -77,7 +84,7 @@ const Waveform = ({
       const x = timeToX(beat);
       if (x < 0 || x > width) return;
 
-      const isBarStart = index % 4 === 0;
+      const isBarStart = index % 4 === downbeatOffset;
       ctx.globalAlpha = 1.0;
       ctx.strokeStyle = isBarStart ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.2)';
       ctx.lineWidth = isBarStart ? 2 : 1;
@@ -86,7 +93,7 @@ const Waveform = ({
       ctx.lineTo(x, height);
       ctx.stroke();
     });
-  }, [showBeatgrid, beatgrid]);
+  }, [showBeatgrid, beatgrid, downbeatOffset]);
 
   // Traditional view: the whole track, drawn once per frame as a single
   // amplitude silhouette colored per-point by frequency content.

@@ -100,6 +100,7 @@ def create_track_document(
         "playCount": 0,
         "likeCount": 0,
         "beatGrid": beatgrid,
+        "downbeatOffset": analysis_data['beatgrid'].get('downbeat_offset', 0),
         "memoryCues": [],  # Would be populated from user interactions
         "waveforms": waveform_urls,
         "analysisMetadata": {

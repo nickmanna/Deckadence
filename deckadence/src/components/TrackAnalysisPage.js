@@ -125,6 +125,7 @@ const TrackAnalysisPage = () => {
             mode: track.mode,
             camelot: track.camelotKey,
             beatgrid: beatgrid, // Converted beatGrid
+            downbeatOffset: track.downbeatOffset || 0,
             waveformData: track.waveformData || {},
             analysisDate: track.analysisMetadata?.analysisDate || new Date().toISOString(),
             confidence: track.analysisMetadata?.confidence || {
@@ -162,6 +163,7 @@ const TrackAnalysisPage = () => {
           mode: 'minor',
           camelot: '1A',
           beatgrid: generateMockBeatgrid(),
+          downbeatOffset: 0,
           waveformData: generateMockWaveformData(),
           analysisDate: new Date().toISOString(),
           confidence: {
