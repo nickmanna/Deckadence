@@ -211,6 +211,31 @@ future frontend builds will point at it.
   production Hosting plus Firestore/Storage rules, and builds + pushes +
   deploys the backend to Cloud Run.
 
+## 4a. Cloud Run resource sizing
+
+The backend does real audio analysis (`librosa` - full-track load, mel
+spectrogram, chromagram, onset detection) before any downsampling happens,
+which is meaningfully memory/CPU-hungry. Cloud Run's platform default
+(512Mi / 1 CPU) was not enough - a real user upload OOM-killed the
+container (confirmed via Cloud Logging: a fresh instance was spun up by
+the autoscaler within 20ms of the request's 500, and the app's own
+exception-handler logging, which always fires on a normal Python
+exception, never appeared - consistent with a SIGKILL rather than a
+caught error).
+
+Current setting (applied manually via `gcloud run services update`, not
+via `deploy.yml` - `deploy-cloudrun@v2` reuses whatever the service is
+currently configured with when you don't pass `flags`, so this persists
+across normal deploys without needing to be in the workflow):
+
+```bash
+gcloud run services update deckadence-backend --region us-central1 \
+  --memory 2Gi --cpu 2 --timeout 300
+```
+
+If this service is ever recreated from scratch (not just redeployed), redo
+this step - a fresh service will start back at Cloud Run's defaults.
+
 ## 5. Rollbacks
 
 - **Hosting**: `firebase hosting:clone` or use the Firebase Console →

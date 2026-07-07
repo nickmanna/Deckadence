@@ -312,22 +312,6 @@
   border-color: #00AEEF;
 }
 
-.mode-select {
-  background: #444;
-  color: #fff;
-  border: 1px solid #555;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  min-width: 80px;
-}
-
-.mode-select:focus {
-  outline: none;
-  border-color: #0EEF;
-}
-
 .volume-slider {
   width: 100px;
   height: 4px;

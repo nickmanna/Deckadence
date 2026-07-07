@@ -15,13 +15,10 @@ const TrackPlayer = ({ track, onClose }) => {
   const [albumCover, setAlbumCover] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(1.0); // Initial zoom level (1x)
   const [viewMode, setViewMode] = useState('traditional'); // 'traditional' or 'dj'
-  const [waveformMode, setWaveformMode] = useState('3band'); // 'blue', 'rgb', or '3band'
-  const [isJogging, setIsJogging] = useState(false);
   const audioRef = useRef(null);
 
   // Handle jog wheel start
   const handleJogStart = useCallback(() => {
-    setIsJogging(true);
     // Pause audio during jogging
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
@@ -30,7 +27,6 @@ const TrackPlayer = ({ track, onClose }) => {
 
   // Handle jog wheel end
   const handleJogEnd = useCallback(() => {
-    setIsJogging(false);
     // Resume audio if it was playing before jogging
     if (audioRef.current && isPlaying) {
       audioRef.current.play().catch(console.error);
@@ -316,16 +312,6 @@ const TrackPlayer = ({ track, onClose }) => {
     setIsPlaying(!isPlaying);
   };
 
-  const handleSeek = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = clickX / rect.width;
-    const newTime = percentage * duration;
-    
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
   const handleVolumeChange = (e) => {
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
@@ -414,21 +400,6 @@ const TrackPlayer = ({ track, onClose }) => {
 
           {/* Waveform Controls */}
           <div className="waveform-controls">
-            
-            {/* Waveform Mode Selector */}
-            <div className="control-group">
-              <label>Mode:</label>
-              <select 
-                value={waveformMode} 
-                onChange={(e) => setWaveformMode(e.target.value)}
-                className="mode-select"
-              >
-                <option value="blue">Blue</option>
-                <option value="rgb">RGB</option>
-                <option value="3band">3-Band</option>
-              </select>
-            </div>
-            
             {viewMode === 'dj' && (
               <div className="control-group">
                 <label>Zoom:</label>
@@ -471,12 +442,9 @@ const TrackPlayer = ({ track, onClose }) => {
             zoomLevel={zoomLevel}
             showWaveform={showWaveform}
             showBeatgrid={showBeatgrid}
-            onSeek={handleSeek}
             onSeekToTime={handleSeekToTime}
-            waveformMode={waveformMode}
             onJogStart={handleJogStart}
             onJogEnd={handleJogEnd}
-            isJogging={isJogging}
             isPlaying={isPlaying}
           />
 

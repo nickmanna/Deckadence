@@ -495,7 +495,7 @@ const GreenRoom = ({ tracks = [] }) => {
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
           >
-            <Waveform 
+            <Waveform
               track={channel.track}
               currentTime={currentTimes[index]}
               duration={channel.track?.duration || 0}
@@ -503,13 +503,10 @@ const GreenRoom = ({ tracks = [] }) => {
               zoomLevel={zoomLevel}
               showWaveform={true}
               showBeatgrid={true}
-              onSeek={() => {}}
               onSeekToTime={(newTime) => handleSeekToTime(index, newTime)}
               onJogStart={() => handleJogStart(index)}
               onJogEnd={() => handleJogEnd(index)}
-              waveformMode="3band"
               isPlaying={playingStates[index]}
-              isJogging={joggingStates[index]}
             />
             {channel.track && (
               <div className="channel-track-info">
