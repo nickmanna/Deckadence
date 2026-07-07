@@ -95,6 +95,7 @@ def create_track_document(
         "status": "ready",
         "bpm": float(analysis_data['bpm']['value']),
         "key": analysis_data['key']['note'],
+        "mode": analysis_data['key']['mode'],
         "camelotKey": analysis_data['key']['camelot'],
         "playCount": 0,
         "likeCount": 0,

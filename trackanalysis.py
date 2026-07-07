@@ -303,10 +303,12 @@ class TrackAnalyzer:
     # (~86 fps) a single 4-minute track's waveform arrays alone serialize
     # to nearly 2 MB - well over the limit, so every save of a real
     # (non-trivially-short) track was failing before this cap existed.
-    # 1500 points is far more resolution than any on-screen waveform
-    # actually needs (the frontend downsamples further for rendering
-    # anyway) and keeps the payload in the tens of KB.
-    WAVEFORM_TARGET_POINTS = 1500
+    # This is a fixed cap, not proportional to track length, so the
+    # payload size is bounded regardless of duration. At 6000 points a
+    # 4-minute track's waveform data is still only ~240KB - comfortably
+    # inside the 1 MiB budget - while giving enough resolution that the
+    # frontend's zoomed-in DJ view doesn't look faceted/low-poly.
+    WAVEFORM_TARGET_POINTS = 6000
 
     @staticmethod
     def _downsample_block_average(values: np.ndarray, target_points: int) -> np.ndarray:

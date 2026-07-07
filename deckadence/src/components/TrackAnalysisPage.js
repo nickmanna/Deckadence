@@ -122,7 +122,7 @@ const TrackAnalysisPage = () => {
             duration: track.duration,
             bpm: track.bpm,
             key: track.key,
-            mode: track.key.includes('m') ? 'minor' : 'major', // Extract mode from key
+            mode: track.mode,
             camelot: track.camelotKey,
             beatgrid: beatgrid, // Converted beatGrid
             waveformData: track.waveformData || {},

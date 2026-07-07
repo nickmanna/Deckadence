@@ -105,14 +105,25 @@ const Waveform = ({
     if (showWaveform) {
       const { times, amplitudes, colors } = points;
       const centerY = height / 2;
-      const barWidth = Math.max(1, width / times.length);
 
-      for (let i = 0; i < times.length; i++) {
-        const x = timeToX(times[i]);
-        const barHeight = Math.max(1, amplitudes[i] * height * 0.45);
+      // Connect each point to the next with a filled quad instead of
+      // drawing disconnected fixed-width bars - adjacent quads share an
+      // edge, so the silhouette is continuous with no gaps ("blocky").
+      for (let i = 0; i < times.length - 1; i++) {
+        const x1 = timeToX(times[i]);
+        const x2 = timeToX(times[i + 1]);
+        const h1 = Math.max(1, amplitudes[i] * height * 0.45);
+        const h2 = Math.max(1, amplitudes[i + 1] * height * 0.45);
+
         ctx.globalAlpha = times[i] < time ? 0.35 : 1.0;
         ctx.fillStyle = colors[i];
-        ctx.fillRect(x, centerY - barHeight, barWidth, barHeight * 2);
+        ctx.beginPath();
+        ctx.moveTo(x1, centerY - h1);
+        ctx.lineTo(x2, centerY - h2);
+        ctx.lineTo(x2, centerY + h2);
+        ctx.lineTo(x1, centerY + h1);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 
@@ -149,17 +160,24 @@ const Waveform = ({
     if (showWaveform) {
       const { times, amplitudes, colors } = points;
       const centerY = height / 2;
-      const pointSpacing = times.length > 1 ? times[1] - times[0] : visibleDuration;
-      const barWidth = Math.max(1, (pointSpacing / visibleDuration) * width);
 
-      for (let i = 0; i < times.length; i++) {
-        if (times[i] < visibleStart || times[i] > visibleEnd) continue;
+      for (let i = 0; i < times.length - 1; i++) {
+        if (times[i + 1] < visibleStart || times[i] > visibleEnd) continue;
 
-        const x = timeToX(times[i]);
-        const barHeight = Math.max(1, amplitudes[i] * height * 0.45);
+        const x1 = timeToX(times[i]);
+        const x2 = timeToX(times[i + 1]);
+        const h1 = Math.max(1, amplitudes[i] * height * 0.45);
+        const h2 = Math.max(1, amplitudes[i + 1] * height * 0.45);
+
         ctx.globalAlpha = times[i] < time ? 0.35 : 1.0;
         ctx.fillStyle = colors[i];
-        ctx.fillRect(x, centerY - barHeight, barWidth, barHeight * 2);
+        ctx.beginPath();
+        ctx.moveTo(x1, centerY - h1);
+        ctx.lineTo(x2, centerY - h2);
+        ctx.lineTo(x2, centerY + h2);
+        ctx.lineTo(x1, centerY + h1);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 
