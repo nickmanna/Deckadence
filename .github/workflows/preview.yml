@@ -44,6 +44,10 @@ jobs:
           REACT_APP_FIREBASE_APP_ID: ${{ secrets.REACT_APP_FIREBASE_APP_ID }}
           REACT_APP_FIREBASE_MEASUREMENT_ID: ${{ secrets.REACT_APP_FIREBASE_MEASUREMENT_ID }}
           REACT_APP_API_BASE_URL: ${{ vars.BACKEND_URL }}
+          # See ci.yml for why this is needed: GitHub Actions sets CI=true by
+          # default, which makes CRA fail the build on pre-existing ESLint
+          # warnings instead of just warning.
+          CI: false
         run: npm run build
 
       - id: auth
