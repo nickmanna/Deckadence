@@ -202,6 +202,15 @@ export function useDeckPlayer(track, { externalVolume } = {}) {
         setAlbumCover(null);
         if (audioRef.current) audioRef.current.src = '';
       }
+
+      // Start decoding for Web Audio loop playback now, in the background,
+      // instead of lazily on first loop activation - that lazy path used to
+      // run a full fetch + decodeAudioData of the whole track right as
+      // <audio> was paused for the loop handoff, producing an audible gap
+      // on the first loop only (later loops hit ensureBuffer's cache).
+      if (audioRef.current?.src) {
+        loopPlayback.preload(audioRef.current.src);
+      }
     };
 
     loadAudioFile();

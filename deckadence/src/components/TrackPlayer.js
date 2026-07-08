@@ -313,7 +313,7 @@ const TrackPlayer = ({ track, onClose }) => {
         {/* Hidden Audio Element */}
         <audio
           ref={audioRef}
-          preload="metadata"
+          preload="auto"
         />
       </div>
     </div>

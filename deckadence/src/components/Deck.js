@@ -106,7 +106,7 @@ const Deck = ({ deckNumber, track, volume, zoomLevel, onDragOver, onDragLeave, o
         </div>
       </div>
 
-      <audio ref={audioRef} preload="metadata" />
+      <audio ref={audioRef} preload="auto" />
     </div>
   );
 };

@@ -183,5 +183,14 @@ export function useLoopPlayback() {
 
   const isActive = useCallback(() => sourceNodeRef.current != null, []);
 
-  return { start, stop, setVolume, getCurrentTime, isActive };
+  // Kicks off the fetch+decode (and AudioContext creation) ahead of time,
+  // so the first actual loop activation hits the ensureBuffer cache
+  // instead of paying for a full-track decode on the critical path right
+  // as <audio> gets paused for the handoff. Fire-and-forget: ensureBuffer
+  // already catches its own errors and just falls back to null.
+  const preload = useCallback((url) => {
+    if (url) ensureBuffer(url);
+  }, [ensureBuffer]);
+
+  return { start, stop, setVolume, getCurrentTime, isActive, preload };
 }
