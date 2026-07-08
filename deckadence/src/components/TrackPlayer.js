@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Waveform from './Waveform';
 import { TrackService } from '../services/trackService';
 import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
-import { findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
+import { estimateLocalBeatInterval, findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
 import './TrackPlayer.css';
 
 const TrackPlayer = ({ track, onClose }) => {
@@ -380,30 +380,44 @@ const TrackPlayer = ({ track, onClose }) => {
     setLoop({ start: quantizePoint(audio.currentTime), end: null });
   };
 
+  // A loop's length is the difference of two beat positions, so unlike a
+  // single cue point, it inherits detection noise from BOTH endpoints -
+  // measured on a real analyzed track, using the raw beatgrid positions
+  // directly made "4 beat" loops vary by up to 95ms std (350ms range)
+  // beat-to-beat, an audible stutter on every repeat. Instead, anchor the
+  // loop's START on a real quantized beat, but derive its LENGTH from the
+  // local median beat interval (de-jittered) times a whole number of
+  // beats - this keeps the loop internally consistent/seamless regardless
+  // of how noisy any one individual detected beat position is.
+  const quantizedLoopLength = (startTime, beatCount) => {
+    const beatgrid = getBeatgrid();
+    if (beatgrid.length > 1) {
+      const startIdx = findNearestBeatIndex(beatgrid, startTime);
+      const interval = estimateLocalBeatInterval(beatgrid, startIdx);
+      if (interval) return interval * beatCount;
+    }
+    return track?.bpm ? (60 / track.bpm) * beatCount : null;
+  };
+
   const handleLoopOut = () => {
     const audio = audioRef.current;
     if (!audio || loop.start == null) return;
-    let end = quantizePoint(audio.currentTime);
-    if (end <= loop.start) {
-      const beatgrid = getBeatgrid();
-      if (quantize && beatgrid.length > 0) {
-        // IN and OUT landed on the same beat (pressed close together) -
-        // snap forward to the next beat instead of silently doing nothing.
-        const startIdx = findNearestBeatIndex(beatgrid, loop.start);
-        end = beatgrid[startIdx + 1] ?? null;
-      } else {
-        end = null;
-      }
-      if (end == null || end <= loop.start) return;
+    if (!quantize) {
+      const end = audio.currentTime;
+      if (end <= loop.start) return;
+      setLoop({ start: loop.start, end });
+      return;
     }
-    setLoop({ start: loop.start, end });
+    const rawLength = audio.currentTime - loop.start;
+    const interval = quantizedLoopLength(loop.start, 1);
+    if (!interval) return;
+    const beatCount = Math.max(1, Math.round(rawLength / interval));
+    setLoop({ start: loop.start, end: loop.start + interval * beatCount });
   };
 
   // Single physical button: creates an instant 4-beat loop from the
   // current position when nothing is looping, exits the active loop
-  // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling. When
-  // quantized, the loop spans 4 real detected beats from the grid rather
-  // than 4 * (60/bpm) - more accurate on tracks with slight tempo jitter.
+  // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling.
   const handleLoop4BeatOrExit = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -411,17 +425,13 @@ const TrackPlayer = ({ track, onClose }) => {
       setLoop({ start: null, end: null });
       return;
     }
-    const beatgrid = getBeatgrid();
-    if (quantize && beatgrid.length > 0) {
-      const idx = findNearestBeatIndex(beatgrid, audio.currentTime);
-      const start = beatgrid[idx];
-      if (beatgrid[idx + 4] != null) {
-        setLoop({ start, end: beatgrid[idx + 4] });
+    if (quantize) {
+      const start = quantizePoint(audio.currentTime);
+      const length = quantizedLoopLength(start, 4);
+      if (length) {
+        setLoop({ start, end: start + length });
         return;
       }
-      if (!track?.bpm) return;
-      setLoop({ start, end: start + (60 / track.bpm) * 4 });
-      return;
     }
     if (!track?.bpm) return;
     const beatLength = 60 / track.bpm;

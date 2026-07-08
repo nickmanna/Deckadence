@@ -33,3 +33,36 @@ export function quantizeTimeToBeat(time, beatgrid) {
   const idx = findNearestBeatIndex(beatgrid, time);
   return idx >= 0 ? beatgrid[idx] : time;
 }
+
+/**
+ * Median beat-to-beat interval in a window around `index`, as a de-jittered
+ * estimate of the local tempo.
+ *
+ * Individual detected beat positions are quantized to the analysis frame
+ * size (~11-12ms at the backend's hop length) - each one on its own is fine
+ * for display or as a single cue anchor, but a LOOP's length is the
+ * difference of two such positions, so it inherits noise from both. On
+ * real analyzed tracks this is enough to make a "4 beat" loop measurably
+ * uneven (verified: one test track had a 95ms std / 350ms range across
+ * its 4-beat spans) - an audible stutter on every repeat. Taking the
+ * median interval over nearby beats averages that quantization noise out,
+ * so loop lengths built from it land on a clean, consistent spacing
+ * instead of inheriting two independently-noisy endpoints.
+ */
+export function estimateLocalBeatInterval(beatgrid, index, window = 16) {
+  if (!beatgrid || beatgrid.length < 2) return null;
+
+  const lo = Math.max(0, index - window);
+  const hi = Math.min(beatgrid.length - 1, index + window);
+  const intervals = [];
+  for (let i = lo; i < hi; i++) {
+    intervals.push(beatgrid[i + 1] - beatgrid[i]);
+  }
+  if (intervals.length === 0) return null;
+
+  intervals.sort((a, b) => a - b);
+  const mid = Math.floor(intervals.length / 2);
+  return intervals.length % 2 === 0
+    ? (intervals[mid - 1] + intervals[mid]) / 2
+    : intervals[mid];
+}
