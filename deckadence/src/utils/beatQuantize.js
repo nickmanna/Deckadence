@@ -91,13 +91,33 @@ const LOOP_END_OUTLIER_THRESHOLD = 0.04;
  * this purpose when it's a genuine outlier - otherwise it's a more
  * precise answer than an average, since it's tied to where the analyzer
  * actually found that specific beat.
+ *
+ * That outlier check is deliberately skipped for beatCount === 1: the
+ * 40ms threshold exists to tell ordinary per-beat detection jitter apart
+ * from a genuinely bad individual detection, calibrated against a track
+ * with a locally stable tempo throughout the averaging window. It isn't
+ * able to tell that apart from a real tempo/section change under the
+ * window (e.g. a loop set on the last beat before a drop) - there the
+ * real next beat legitimately disagrees with the 16-beat-window average
+ * by more than ordinary jitter, because that average is blending two
+ * different local tempos across the transition, not because the real
+ * detection is wrong. A single beat has no second detected position to
+ * average against in the first place (unlike a multi-beat loop, where
+ * averaging combats compounding jitter across several hops), so there's
+ * no compounding-noise case here to justify preferring the smoothed
+ * value - the real, already-cleaned (see _clean_beat_times server-side)
+ * detected position is the better answer unconditionally.
  */
 export function estimateLoopEnd(beatgrid, startIndex, beatCount) {
   const interval = estimateLocalBeatInterval(beatgrid, startIndex);
   if (interval == null) return null;
 
-  const smoothedEnd = beatgrid[startIndex] + interval * beatCount;
   const realEnd = beatgrid[startIndex + beatCount];
+  if (beatCount === 1) {
+    return realEnd ?? beatgrid[startIndex] + interval;
+  }
+
+  const smoothedEnd = beatgrid[startIndex] + interval * beatCount;
   if (realEnd != null && Math.abs(realEnd - smoothedEnd) < LOOP_END_OUTLIER_THRESHOLD) {
     return realEnd;
   }
