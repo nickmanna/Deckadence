@@ -390,21 +390,32 @@ const TrackPlayer = ({ track, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, loop.start, loop.end]);
 
-  // Drive the waveform playhead from the Web Audio clock while a loop is
-  // actively playing there, since the <audio> element is paused (and so
-  // stops emitting timeupdate events) for the duration of the loop.
+  // Drive the displayed playhead from a rAF loop for the entire time
+  // audio is playing, not just while a loop is active. The <audio>
+  // element's native 'timeupdate' event (still wired up above for
+  // duration/ended bookkeeping) is throttled by the browser to roughly
+  // 4 times a second - fine for a progress bar, but coarse enough that
+  // the DJ view's playhead visibly lags real position, and any cue/loop
+  // point captured from a live click renders relative to a "now" that's
+  // up to ~250ms stale, making it look placed away from where you
+  // actually clicked until the next timeupdate tick catches the view up
+  // - even though the captured time itself (read live off audio.currentTime
+  // at click time) was already accurate. rAF isn't a true audio clock
+  // (see useLoopPlayback's docs on why loop *enforcement* itself needs
+  // the Web Audio API instead), but for cosmetic playhead position it's
+  // a much tighter approximation than timeupdate alone.
   useEffect(() => {
-    if (!isPlaying || loop.start == null || loop.end == null) return undefined;
+    if (!isPlaying) return undefined;
     let raf;
     const update = () => {
-      const t = loopPlayback.getCurrentTime();
+      const t = loopPlayback.isActive() ? loopPlayback.getCurrentTime() : audioRef.current?.currentTime;
       if (t != null) setCurrentTime(t);
       raf = requestAnimationFrame(update);
     };
     raf = requestAnimationFrame(update);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, loop.start, loop.end]);
+  }, [isPlaying]);
 
   // Correct current-position read regardless of which engine is driving
   // playback right now - used anywhere a handler needs "where are we
