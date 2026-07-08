@@ -2,10 +2,34 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { TrackService } from '../services/trackService';
-import Waveform from './Waveform';
+import Deck from './Deck';
 import './GreenRoom.css';
 
-const GreenRoom = ({ tracks = [] }) => {
+// A stable reference for the "no tracks prop passed" default - `tracks =
+// []` inline would create a brand new array on every render (function
+// components re-evaluate their default params every call), which fed
+// straight into the tracks-loading effect's dependency array below and
+// caused an infinite render loop the instant this page was reachable
+// (previously masked entirely, since the greenRoom feature flag always
+// rendered ComingSoon instead of this component).
+const EMPTY_TRACKS = [];
+
+// Which side of the crossfader each channel responds to - odd/even split
+// (1&3 vs 2&4) matches how a real club mixer's channel assign switches are
+// conventionally wired, rather than pairing by screen position (1&2 vs
+// 3&4). In 2-channel mode only channels 1 (A) and 2 (B) are ever visible,
+// so this still reduces to a plain 2-deck crossfader.
+const CROSSFADER_GROUP = { 1: 'A', 2: 'B', 3: 'A', 4: 'B' };
+
+// Simple "hold full, then fade" curve rather than true equal-power - good
+// enough for a practice mixer without needing a dedicated gain-law lookup.
+const crossfaderMultiplier = (position, group) => {
+  if (group === 'A') return position <= 0.5 ? 1 : Math.max(0, 1 - (position - 0.5) * 2);
+  if (group === 'B') return position >= 0.5 ? 1 : Math.max(0, position * 2);
+  return 1;
+};
+
+const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const dropdownRefs = useRef({});
   const navigate = useNavigate();
@@ -20,18 +44,19 @@ const GreenRoom = ({ tracks = [] }) => {
   const [userStats, setUserStats] = useState(null);
   const [filteredTracks, setFilteredTracks] = useState(tracks);
   const [loading, setLoading] = useState(false);
-  
+
+  // 2-deck vs 4-deck layout, and the mixer state driving each deck's gain.
+  const [channelCount, setChannelCount] = useState(2);
+  const [channelFaders, setChannelFaders] = useState([0.8, 0.8, 0.8, 0.8]);
+  const [crossfader, setCrossfader] = useState(0.5);
+
+  const getEffectiveVolume = (channelId, faderIndex) =>
+    channelFaders[faderIndex] * crossfaderMultiplier(crossfader, CROSSFADER_GROUP[channelId]);
+
   // Track list resizing state
   const [isResizing, setIsResizing] = useState(false);
   const [trackListHeight, setTrackListHeight] = useState(180);
   const trackListRef = useRef(null);
-
-  // Jogging state for each channel
-  const [joggingStates, setJoggingStates] = useState([false, false, false, false]);
-  const [currentTimes, setCurrentTimes] = useState([0, 0, 0, 0]);
-  
-  // Play state for each channel
-  const [playingStates, setPlayingStates] = useState([false, false, false, false]);
 
   const handleTrackClick = (track) => {
     console.log('Track clicked:', track);
@@ -88,44 +113,6 @@ const GreenRoom = ({ tracks = [] }) => {
         )
       );
     }
-  };
-
-  // Jogging handlers for each channel
-  const handleJogStart = (channelIndex) => {
-    console.log('Jog start for channel', channelIndex + 1);
-    setJoggingStates(prev => {
-      const newStates = [...prev];
-      newStates[channelIndex] = true;
-      return newStates;
-    });
-  };
-
-  const handleJogEnd = (channelIndex) => {
-    console.log('Jog end for channel', channelIndex + 1);
-    setJoggingStates(prev => {
-      const newStates = [...prev];
-      newStates[channelIndex] = false;
-      return newStates;
-    });
-  };
-
-  const handleSeekToTime = (channelIndex, newTime) => {
-    console.log('Seek to time for channel', channelIndex + 1, ':', newTime);
-    setCurrentTimes(prev => {
-      const newTimes = [...prev];
-      newTimes[channelIndex] = newTime;
-      return newTimes;
-    });
-  };
-
-  // Play/pause handlers for channels
-  const handlePlayPause = (channelIndex) => {
-    console.log('Play/pause for channel', channelIndex + 1);
-    setPlayingStates(prev => {
-      const newStates = [...prev];
-      newStates[channelIndex] = !newStates[channelIndex];
-      return newStates;
-    });
   };
 
   // Track list resize handlers
@@ -476,83 +463,84 @@ const GreenRoom = ({ tracks = [] }) => {
             </div>
           </div>
         </div>
-      </div>
-      
-      <div className="options-container">
-        <div className="options-header">
+
+        <div className="channel-count-toggle">
+          <button
+            className={`channel-count-btn ${channelCount === 2 ? 'active' : ''}`}
+            onClick={() => setChannelCount(2)}
+          >
+            2 CH
+          </button>
+          <button
+            className={`channel-count-btn ${channelCount === 4 ? 'active' : ''}`}
+            onClick={() => setChannelCount(4)}
+          >
+            4 CH
+          </button>
         </div>
       </div>
-      <div className="fx-container">
-        <div className="fx-header">
-        </div>
-      </div>
+
       <div className="waveform-container">
-        {channels.map((channel, index) => (
-          <div 
+        {channels.slice(0, channelCount).map((channel, index) => (
+          <Deck
             key={channel.id}
-            className="waveform-drop-zone"
+            deckNumber={channel.id}
+            track={channel.track}
+            volume={getEffectiveVolume(channel.id, index)}
+            zoomLevel={zoomLevel}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
-          >
-            <Waveform
-              track={channel.track}
-              currentTime={currentTimes[index]}
-              duration={channel.track?.duration || 0}
-              viewMode="dj"
-              zoomLevel={zoomLevel}
-              showWaveform={true}
-              showBeatgrid={true}
-              onSeekToTime={(newTime) => handleSeekToTime(index, newTime)}
-              onJogStart={() => handleJogStart(index)}
-              onJogEnd={() => handleJogEnd(index)}
-              isPlaying={playingStates[index]}
-            />
-            {channel.track && (
-              <div className="channel-track-info">
-                <span>{channel.track.fileName}</span>
-              </div>
-            )}
-          </div>
+          />
         ))}
       </div>
-      
-      {/* DJ Controls */}
+
+      {/* Mixer: per-channel volume fader plus a shared crossfader. EQ is
+          intentionally not here yet - it needs each deck's audio routed
+          through Web Audio filter nodes rather than the plain <audio>
+          element playback used today, which is a bigger follow-up. */}
       <div className="dj-controls">
-        <div className="dj-controls-left">
-          {channels.slice(0, 2).map((channel, index) => (
-            <div key={channel.id} className="channel-control">
-              <div className="channel-header">
-                <span className="channel-name">{channel.name}</span>
-                <button 
-                  className={`play-button ${playingStates[index] ? 'playing' : ''}`}
-                  onClick={() => handlePlayPause(index)}
-                >
-                  {playingStates[index] ? '⏸️' : '▶️'}
-                </button>
+        <div className="fader-container">
+          {channels.slice(0, channelCount).map((channel, index) => (
+            <div key={channel.id} className="fader-control">
+              <span className="fader-group-label">{CROSSFADER_GROUP[channel.id]}</span>
+              <div className="fader-track">
+                <input
+                  type="range"
+                  className="fader-slider-input"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={channelFaders[index]}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    setChannelFaders((prev) => {
+                      const next = [...prev];
+                      next[index] = value;
+                      return next;
+                    });
+                  }}
+                />
               </div>
+              <span className="fader-label">CH {channel.id}</span>
             </div>
           ))}
         </div>
-        <div className="dj-controls-center">
-        </div>
-        <div className="dj-controls-right">
-          {channels.slice(2, 4).map((channel, index) => (
-            <div key={channel.id} className="channel-control">
-              <div className="channel-header">
-                <span className="channel-name">{channel.name}</span>
-                <button 
-                  className={`play-button ${playingStates[index + 2] ? 'playing' : ''}`}
-                  onClick={() => handlePlayPause(index + 2)}
-                >
-                  {playingStates[index + 2] ? '⏸️' : '▶️'}
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="crossfader-container">
+          <span className="crossfader-label">A</span>
+          <input
+            type="range"
+            className="crossfader-slider"
+            min="0"
+            max="1"
+            step="0.01"
+            value={crossfader}
+            onChange={(e) => setCrossfader(parseFloat(e.target.value))}
+          />
+          <span className="crossfader-label">B</span>
         </div>
       </div>
-      
+
       {/* Track List - Separate Section */}
       <div 
         className="track-list"

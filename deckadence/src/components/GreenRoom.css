@@ -18,6 +18,35 @@
   flex-shrink: 0;
 }
 
+.channel-count-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.channel-count-btn {
+  background: transparent;
+  border: 1px solid #555;
+  color: #ccc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.channel-count-btn:hover {
+  border-color: #4ecdc4;
+  color: #fff;
+}
+
+.channel-count-btn.active {
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  border-color: transparent;
+  color: #fff;
+}
+
 .green-room-tab {
   position: relative;
 }
@@ -168,10 +197,12 @@
   display: none;
 }
 
-.waveform-container > * {
-  height: 100% !important;
-  min-height: 60px !important;
-  max-height: 60px !important;
+/* Each deck (header + waveform + transport) shares the row equally;
+   height comes from flex, not a fixed cap, since a deck now needs room
+   for more than just the waveform strip. */
+.waveform-container > .deck {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Override Waveform component heights in GreenRoom */
@@ -268,6 +299,154 @@
   border-radius: 8px;
 }
 
+.deck {
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.deck .waveform-drop-zone {
+  flex: 1;
+  min-height: 0;
+}
+
+.deck-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  background: #232323;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.deck-number {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deck-track-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.deck-track-title {
+  color: #eee;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deck-track-meta {
+  color: #4ecdc4;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.deck-transport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #1c1c1c;
+  border-top: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.deck-btn {
+  background: #333;
+  border: 1px solid #444;
+  color: #eee;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.deck-btn:hover:not(:disabled) {
+  background: #444;
+  border-color: #4ecdc4;
+}
+
+.deck-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.deck-play-btn {
+  background: #4ecdc4;
+  border-color: #4ecdc4;
+  color: #0a0a0a;
+  min-width: 30px;
+}
+
+.deck-play-btn.playing {
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.deck-loop-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deck-loop-btn {
+  padding: 4px 7px;
+  min-width: 24px;
+}
+
+.deck-quantize-btn.active {
+  background: #4ecdc4;
+  color: #0a0a0a;
+  border-color: #4ecdc4;
+}
+
+.deck-pitch-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.deck-pitch-control label {
+  color: #888;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.deck-pitch-control input[type="range"] {
+  width: 70px;
+  accent-color: #4ecdc4;
+}
+
+.deck-pitch-value {
+  color: #ccc;
+  font-size: 11px;
+  font-weight: 600;
+  width: 36px;
+  text-align: right;
+}
+
 .list-item {
   cursor: grab;
 }
@@ -275,24 +454,6 @@
 .list-item:active {
   cursor: grabbing;
 }
-
-.channel-track-info {
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  z-index: 10;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-
 
 .track-title {
   flex: 1;
@@ -359,6 +520,9 @@
 
 .dj-controls {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
   height: 25vh;
   background: #1a1a1a;
   border-top: 1px solid #333;
@@ -366,56 +530,16 @@
   flex-shrink: 0;
   position: relative;
   z-index: 50;
-}
-
-.dj-controls-left {
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-  background: #2a2a2a;
-  border-right: 1px solid #333;
-  overflow: hidden;
-}
-
-.dj-controls-center {
-  flex: 1;
-  background: #1a1a1a;
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.fader-eq-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: 100%;
-}
-
-.fader-section,
-.eq-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.fader-section h3,
-.eq-section h3 {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0;
-  text-align: center;
+  box-sizing: border-box;
 }
 
 .fader-container {
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
   align-items: flex-end;
-  height: 120px;
-  gap: 20px;
+  height: 100%;
+  gap: 28px;
 }
 
 .fader-control {
@@ -425,38 +549,55 @@
   gap: 8px;
 }
 
+.fader-group-label {
+  color: #888;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .fader-track {
-  width: 20px;
+  width: 24px;
   height: 100px;
   background: #333;
   border-radius: 10px;
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
-.fader-slider {
-  width: 24px;
-  height: 40px;
-  background: #4ecdc4;
-  border-radius: 12px;
-  position: absolute;
-  bottom: 20px;
+.fader-slider-input {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 100%;
+  height: 100%;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.fader-slider:hover {
-  background: #45b7af;
-  transform: scale(1.05);
+  accent-color: #4ecdc4;
 }
 
 .fader-label {
   color: #ccc;
   font-size: 11px;
   font-weight: 600;
+}
+
+.crossfader-container {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.crossfader-label {
+  color: #888;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.crossfader-slider {
+  width: 220px;
+  accent-color: #ff6b6b;
+  cursor: pointer;
 }
 
 .eq-container {
@@ -529,152 +670,4 @@
   color: #ccc;
   font-size: 11px;
   font-weight: 600;
-}
-
-.dj-controls-right {
-  width: 200px;
-  background: #2a2a2a;
-  border-left: 1px solid #333;
-}
-
-.channel-control {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid #333;
-  min-height: 0;
-}
-
-.channel-control:last-child {
-  border-bottom: none;
-}
-
-.channel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #333;
-  border-bottom: 1px solid #444;
-  flex-shrink: 0;
-}
-
-.channel-name {
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.play-button {
-  background: #4ecdc4;
-  border: none;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  transition: all 0.2s ease;
-}
-
-.play-button:hover {
-  background: #45b7af;
-  transform: scale(1.1);
-}
-
-.play-button.playing {
-  background: #ff6b6b;
-}
-
-.channel-content {
-  flex: 1;
-  display: flex;
-  padding: 8px;
-  gap: 8px;
-  min-height: 0;
-}
-
-.album-cover {
-  width: 60px;
-  height: 60px;
-  flex-shrink: 0;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-placeholder {
-  font-size: 24px;
-  color: #666;
-}
-
-.vinyl-tempo {
-  width: 60px;
-  height: 60px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.vinyl-disc {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #000, #333);
-  border: 2px solid #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  animation: spin 2s linear infinite;
-}
-
-.vinyl-disc::before {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  background: #fff;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.tempo {
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.traditional-waveform {
-  flex: 1;
-  min-height: 0;
-  background: #1a1a1a;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
