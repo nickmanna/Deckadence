@@ -416,6 +416,25 @@ class TrackAnalyzer:
             out[i] = values[start:end].mean() if end > start else values[min(start, n - 1)]
         return out
 
+    @staticmethod
+    def _downsample_block_max(values: np.ndarray, target_points: int) -> np.ndarray:
+        """Downsample by taking the max of contiguous blocks - unlike
+        _downsample_block_average, this preserves a single sharp spike
+        inside a block instead of diluting it with its quieter neighbors,
+        which is what a peak-style amplitude channel needs this final
+        downsampling step to also respect (see generate_waveform_data)."""
+        values = np.asarray(values, dtype=float)
+        n = len(values)
+        if n <= target_points:
+            return values
+
+        edges = np.linspace(0, n, target_points + 1).astype(int)
+        out = np.empty(target_points)
+        for i in range(target_points):
+            start, end = edges[i], edges[i + 1]
+            out[i] = values[start:end].max() if end > start else values[min(start, n - 1)]
+        return out
+
     def generate_waveform_data(self) -> Dict:
         """
         Generate Rekordbox-style 3-band waveform data (overall amplitude
@@ -431,14 +450,23 @@ class TrackAnalyzer:
         frame_length = 2048
         hop_length = 512
 
-        rms = librosa.feature.rms(
-            y=self.y,
-            frame_length=frame_length,
-            hop_length=hop_length
-        )[0]
-        rms_normalized = rms / np.max(rms) if np.max(rms) > 0 else rms
+        # Peak (max absolute sample) per frame, not RMS (energy averaged
+        # across the whole ~46ms frame at this frame_length/sr). RMS is
+        # what actually caused the shape mismatch against Rekordbox-style
+        # waveforms: averaging a percussive hit's sharp attack over a wide
+        # window smears it into a gradual swell ("trapezoid"), while a
+        # peak-per-bucket measure keeps the instantaneous spike right at
+        # the transient ("vertical line"), matching what Rekordbox/Serato/
+        # Traktor-style displays actually plot. Padding to match
+        # librosa.feature.rms's own centered framing (frame t centered at
+        # y[t * hop_length]) keeps this on the same time grid as
+        # everything else derived below, rather than needing its own.
+        y_padded = np.pad(self.y, frame_length // 2, mode='constant')
+        frames = librosa.util.frame(y_padded, frame_length=frame_length, hop_length=hop_length)
+        peak_amplitude = np.max(np.abs(frames), axis=0)
+        peak_normalized = peak_amplitude / np.max(peak_amplitude) if np.max(peak_amplitude) > 0 else peak_amplitude
 
-        times = librosa.times_like(rms, sr=self.sr, hop_length=hop_length)
+        times = librosa.times_like(peak_amplitude, sr=self.sr, hop_length=hop_length)
 
         # 3-band frequency split (verified against librosa.mel_frequencies
         # for n_mels=128, fmax=sr/2=22050Hz):
@@ -472,11 +500,15 @@ class TrackAnalyzer:
         mid_normalized = np.power(mid_normalized, 0.8)
         high_normalized = np.power(high_normalized, 0.9)
 
-        min_length = min(len(times), len(rms_normalized), len(low_normalized), len(mid_normalized), len(high_normalized))
+        min_length = min(len(times), len(peak_normalized), len(low_normalized), len(mid_normalized), len(high_normalized))
 
         target_points = min(self.WAVEFORM_TARGET_POINTS, min_length)
         ds_times = self._downsample_block_average(times[:min_length], target_points)
-        ds_amplitudes = self._downsample_block_average(rms_normalized[:min_length], target_points)
+        # Max, not average, for the same reason peak-per-frame replaced RMS
+        # above - averaging blocks together for the final point-budget
+        # downsample would just re-introduce the same smearing one step
+        # later.
+        ds_amplitudes = self._downsample_block_max(peak_normalized[:min_length], target_points)
         ds_low = self._downsample_block_average(low_normalized[:min_length], target_points)
         ds_mid = self._downsample_block_average(mid_normalized[:min_length], target_points)
         ds_high = self._downsample_block_average(high_normalized[:min_length], target_points)
@@ -495,7 +527,7 @@ class TrackAnalyzer:
             'duration': len(self.y) / self.sr,
             'frame_length': frame_length,
             'hop_length': hop_length,
-            'analysis_version': '2.1.0'
+            'analysis_version': '2.2.0'  # amplitude channel is now peak-based, not RMS
         }
 
         waveform_data['metadata'] = {
