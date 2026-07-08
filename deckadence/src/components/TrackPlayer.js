@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Waveform from './Waveform';
 import { TrackService } from '../services/trackService';
 import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
+import { findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
 import './TrackPlayer.css';
 
 const TrackPlayer = ({ track, onClose }) => {
@@ -11,6 +12,7 @@ const TrackPlayer = ({ track, onClose }) => {
   const [volume, setVolume] = useState(0.7);
   const [cuePoint, setCuePoint] = useState(0);
   const [loop, setLoop] = useState({ start: null, end: null });
+  const [quantize, setQuantize] = useState(true);
   const cuePreviewRef = useRef(false);
   const [showWaveform, setShowWaveform] = useState(true);
   const [showBeatgrid, setShowBeatgrid] = useState(true);
@@ -323,6 +325,17 @@ const TrackPlayer = ({ track, onClose }) => {
     cuePreviewRef.current = false;
   }, [track]);
 
+  // Getting this from track props fresh each call (rather than useMemo)
+  // keeps it trivially in sync if the track prop ever changes underneath
+  // an open player, at negligible cost - it's just a property read.
+  const getBeatgrid = () => track?.beatgrid || track?.beatGrid || [];
+
+  // Manual loop/cue points landing a few ms off the real beat is exactly
+  // what makes hand-set loops sound "off" on every repeat - snapping to
+  // the nearest detected beat (real detected positions, not an assumed
+  // constant tempo) is what a hardware CDJ's quantize does too.
+  const quantizePoint = (time) => (quantize ? quantizeTimeToBeat(time, getBeatgrid()) : time);
+
   // Standard CDJ-style CUE behavior:
   // - pressed while playing: stop and jump back to the cue point.
   // - pressed while paused, already at the cue point: preview-play for as
@@ -345,7 +358,7 @@ const TrackPlayer = ({ track, onClose }) => {
       audio.play().catch(console.error);
       setIsPlaying(true);
     } else {
-      setCuePoint(audio.currentTime);
+      setCuePoint(quantizePoint(audio.currentTime));
     }
   };
 
@@ -364,23 +377,50 @@ const TrackPlayer = ({ track, onClose }) => {
   const handleLoopIn = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    setLoop({ start: audio.currentTime, end: null });
+    setLoop({ start: quantizePoint(audio.currentTime), end: null });
   };
 
   const handleLoopOut = () => {
     const audio = audioRef.current;
-    if (!audio || loop.start == null || audio.currentTime <= loop.start) return;
-    setLoop({ start: loop.start, end: audio.currentTime });
+    if (!audio || loop.start == null) return;
+    let end = quantizePoint(audio.currentTime);
+    if (end <= loop.start) {
+      const beatgrid = getBeatgrid();
+      if (quantize && beatgrid.length > 0) {
+        // IN and OUT landed on the same beat (pressed close together) -
+        // snap forward to the next beat instead of silently doing nothing.
+        const startIdx = findNearestBeatIndex(beatgrid, loop.start);
+        end = beatgrid[startIdx + 1] ?? null;
+      } else {
+        end = null;
+      }
+      if (end == null || end <= loop.start) return;
+    }
+    setLoop({ start: loop.start, end });
   };
 
   // Single physical button: creates an instant 4-beat loop from the
   // current position when nothing is looping, exits the active loop
-  // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling.
+  // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling. When
+  // quantized, the loop spans 4 real detected beats from the grid rather
+  // than 4 * (60/bpm) - more accurate on tracks with slight tempo jitter.
   const handleLoop4BeatOrExit = () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (loop.start != null && loop.end != null) {
       setLoop({ start: null, end: null });
+      return;
+    }
+    const beatgrid = getBeatgrid();
+    if (quantize && beatgrid.length > 0) {
+      const idx = findNearestBeatIndex(beatgrid, audio.currentTime);
+      const start = beatgrid[idx];
+      if (beatgrid[idx + 4] != null) {
+        setLoop({ start, end: beatgrid[idx + 4] });
+        return;
+      }
+      if (!track?.bpm) return;
+      setLoop({ start, end: start + (60 / track.bpm) * 4 });
       return;
     }
     if (!track?.bpm) return;
@@ -591,14 +631,6 @@ const TrackPlayer = ({ track, onClose }) => {
                 <span>/</span>
                 <span>{formatTime(duration)}</span>
               </div>
-
-              <span className={`midi-status ${midiStatus.connected ? 'connected' : ''}`}>
-                {midiStatus.connected
-                  ? `🎛️ ${midiStatus.deviceName}`
-                  : midiStatus.supported
-                    ? 'No MIDI controller connected'
-                    : 'MIDI not supported in this browser'}
-              </span>
             </div>
 
             <div className="loop-controls">
@@ -612,6 +644,38 @@ const TrackPlayer = ({ track, onClose }) => {
               <button className="loop-btn" onClick={handleLoopCallRight} disabled={loop.end == null}>▷ x2</button>
               {loop.start != null && loop.end != null && (
                 <span className="loop-length">{(loop.end - loop.start).toFixed(2)}s</span>
+              )}
+              <button
+                className={`quantize-btn ${quantize ? 'active' : ''}`}
+                onClick={() => setQuantize((q) => !q)}
+                title="Snap cue/loop points to the beat grid"
+              >
+                Q
+              </button>
+            </div>
+
+            <div className="midi-panel">
+              {midiStatus.connected ? (
+                <span className="midi-status connected">
+                  🎛️ Connected: {midiStatus.deviceNames.join(', ')}
+                </span>
+              ) : (
+                <>
+                  <span className="midi-status">
+                    {midiStatus.supported ? 'No MIDI controller connected' : 'MIDI not supported in this browser'}
+                  </span>
+                  {midiStatus.supported && (
+                    <button className="midi-connect-btn" onClick={midiStatus.connect}>
+                      Connect MIDI Controller
+                    </button>
+                  )}
+                </>
+              )}
+              {midiStatus.error && <span className="midi-error">Error: {midiStatus.error}</span>}
+              {midiStatus.lastMessage && (
+                <span className="midi-last-message">
+                  Last MIDI in: {midiStatus.lastMessage.hex} ({Math.round((Date.now() - midiStatus.lastMessage.at) / 1000)}s ago)
+                </span>
               )}
             </div>
 

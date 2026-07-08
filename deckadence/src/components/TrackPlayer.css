@@ -302,13 +302,75 @@
 }
 
 .midi-status {
-  margin-left: auto;
   color: #888;
   font-size: 0.8rem;
 }
 
 .midi-status.connected {
   color: #4ecdc4;
+}
+
+.midi-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #232323;
+  border-radius: 6px;
+  border: 1px solid #3a3a3a;
+}
+
+.midi-connect-btn {
+  background: #444;
+  color: #fff;
+  border: 1px solid #00AEEF;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.midi-connect-btn:hover {
+  background: #00AEEF;
+}
+
+.midi-error {
+  color: #ff6b6b;
+  font-size: 0.8rem;
+}
+
+.midi-last-message {
+  color: #666;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+}
+
+.quantize-btn {
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.quantize-btn:hover {
+  border-color: #FF9500;
+  color: #fff;
+}
+
+.quantize-btn.active {
+  background: #FF9500;
+  color: #1a1a1a;
+  border-color: #FF9500;
 }
 
 .loop-controls {

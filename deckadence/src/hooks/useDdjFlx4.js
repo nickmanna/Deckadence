@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Deck 1/2 NOTE numbers for the controls this app currently hooks up, taken
 // directly from Pioneer's official "DDJ-FLX4 List of MIDI messages" (Ver
@@ -43,11 +43,25 @@ export function decodeDdjFlx4Message(data) {
   };
 }
 
+const toHex = (data) => Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+
 /**
- * Connects to a DDJ-FLX4 (or any Web MIDI input, as a fallback) and routes
- * Deck 1's PLAY, CUE and loop buttons to the given handlers. Deck 2 is
- * ignored for now since the track library preview only has one deck to
- * control.
+ * Connects to a DDJ-FLX4 (or any Web MIDI input) and routes Deck 1's PLAY,
+ * CUE and loop buttons to the given handlers. Deck 2 is ignored for now
+ * since the track library preview only has one deck to control.
+ *
+ * Listens on EVERY currently available MIDI input, not just a single
+ * best-guess pick - some controllers/OS combinations expose more than one
+ * port for the same device, and picking the wrong one would silently drop
+ * every message. Also exposes enough raw diagnostic state (all detected
+ * device names, the last raw message seen, any request error) that
+ * connection problems can be diagnosed from the UI instead of guessing.
+ *
+ * requestMIDIAccess() is NOT called automatically on mount - some browsers
+ * only reliably show the permission prompt when it's triggered from a real
+ * user gesture (click/tap), so callers must invoke the returned connect()
+ * from an onClick handler. A silent best-effort attempt is still made on
+ * mount in case permission was already granted in a previous session.
  *
  * Handlers are read from a ref that's refreshed every render, so callers
  * can pass plain inline functions without needing to memoize them or
@@ -60,82 +74,91 @@ export function useDdjFlx4Controller(handlers) {
   const [status, setStatus] = useState({
     supported: typeof navigator !== 'undefined' && 'requestMIDIAccess' in navigator,
     connected: false,
-    deviceName: null,
+    deviceNames: [],
+    lastMessage: null,
     error: null,
   });
 
-  useEffect(() => {
+  const midiAccessRef = useRef(null);
+
+  const onMessage = useCallback((event) => {
+    setStatus((s) => ({ ...s, lastMessage: { hex: toHex(event.data), at: Date.now() } }));
+
+    const decoded = decodeDdjFlx4Message(event.data);
+    if (!decoded || decoded.deck !== 1) return;
+
+    const h = handlersRef.current || {};
+    switch (decoded.control) {
+      case 'play':
+        if (decoded.pressed) h.onPlayPause?.();
+        break;
+      case 'cue':
+        if (decoded.pressed) h.onCuePress?.();
+        else h.onCueRelease?.();
+        break;
+      case 'loopIn':
+        if (decoded.pressed) h.onLoopIn?.();
+        break;
+      case 'loopOut':
+        if (decoded.pressed) h.onLoopOut?.();
+        break;
+      case 'loopExit4Beat':
+        if (decoded.pressed) h.onLoop4BeatOrExit?.();
+        break;
+      case 'loopCallLeft':
+        if (decoded.pressed) h.onLoopCallLeft?.();
+        break;
+      case 'loopCallRight':
+        if (decoded.pressed) h.onLoopCallRight?.();
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  const attachAllInputs = useCallback((access) => {
+    const inputs = Array.from(access.inputs.values());
+    inputs.forEach((input) => {
+      input.onmidimessage = onMessage;
+    });
+    setStatus((s) => ({
+      ...s,
+      connected: inputs.length > 0,
+      deviceNames: inputs.map((i) => i.name || '(unnamed device)'),
+      error: null,
+    }));
+  }, [onMessage]);
+
+  const connect = useCallback(() => {
     if (!status.supported) return;
-    let midiAccess = null;
-    let activeInput = null;
-
-    const onMessage = (event) => {
-      const decoded = decodeDdjFlx4Message(event.data);
-      if (!decoded || decoded.deck !== 1) return;
-
-      const h = handlersRef.current || {};
-      switch (decoded.control) {
-        case 'play':
-          if (decoded.pressed) h.onPlayPause?.();
-          break;
-        case 'cue':
-          if (decoded.pressed) h.onCuePress?.();
-          else h.onCueRelease?.();
-          break;
-        case 'loopIn':
-          if (decoded.pressed) h.onLoopIn?.();
-          break;
-        case 'loopOut':
-          if (decoded.pressed) h.onLoopOut?.();
-          break;
-        case 'loopExit4Beat':
-          if (decoded.pressed) h.onLoop4BeatOrExit?.();
-          break;
-        case 'loopCallLeft':
-          if (decoded.pressed) h.onLoopCallLeft?.();
-          break;
-        case 'loopCallRight':
-          if (decoded.pressed) h.onLoopCallRight?.();
-          break;
-        default:
-          break;
-      }
-    };
-
-    const attachInput = (input) => {
-      if (activeInput) activeInput.onmidimessage = null;
-      activeInput = input;
-      if (input) {
-        input.onmidimessage = onMessage;
-        setStatus((s) => ({ ...s, connected: true, deviceName: input.name, error: null }));
-      } else {
-        setStatus((s) => ({ ...s, connected: false, deviceName: null }));
-      }
-    };
-
-    const pickInput = () => {
-      if (!midiAccess) return;
-      const inputs = Array.from(midiAccess.inputs.values());
-      const ddj = inputs.find((i) => /ddj-?flx4/i.test(i.name || ''));
-      attachInput(ddj || inputs[0] || null);
-    };
-
     navigator.requestMIDIAccess()
       .then((access) => {
-        midiAccess = access;
-        pickInput();
-        access.onstatechange = pickInput;
+        midiAccessRef.current = access;
+        attachAllInputs(access);
+        access.onstatechange = () => attachAllInputs(access);
       })
       .catch((error) => {
         setStatus((s) => ({ ...s, connected: false, error: error.message }));
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status.supported, attachAllInputs]);
 
+  // Best-effort silent attempt on mount - succeeds instantly if this origin
+  // was already granted MIDI permission in a previous visit, otherwise
+  // no-ops (no permission prompt without a user gesture, by design).
+  useEffect(() => {
+    connect();
     return () => {
-      if (activeInput) activeInput.onmidimessage = null;
-      if (midiAccess) midiAccess.onstatechange = null;
+      const access = midiAccessRef.current;
+      if (access) {
+        access.onstatechange = null;
+        access.inputs.forEach((input) => {
+          input.onmidimessage = null;
+        });
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status.supported]);
+  }, []);
 
-  return status;
+  return { ...status, connect };
 }
