@@ -3,7 +3,7 @@ import Waveform from './Waveform';
 import { TrackService } from '../services/trackService';
 import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
 import { useLoopPlayback } from '../hooks/useLoopPlayback';
-import { estimateLocalBeatInterval, findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
+import { estimateLocalBeatInterval, estimateLoopEnd, findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
 import './TrackPlayer.css';
 
 const TrackPlayer = ({ track, onClose }) => {
@@ -477,22 +477,25 @@ const TrackPlayer = ({ track, onClose }) => {
   };
 
   // A loop's length is the difference of two beat positions, so unlike a
-  // single cue point, it inherits detection noise from BOTH endpoints -
+  // single cue point, it inherits detection noise from both endpoints -
   // measured on a real analyzed track, using the raw beatgrid positions
   // directly made "4 beat" loops vary by up to 95ms std (350ms range)
-  // beat-to-beat, an audible stutter on every repeat. Instead, anchor the
-  // loop's START on a real quantized beat, but derive its LENGTH from the
-  // local median beat interval (de-jittered) times a whole number of
-  // beats - this keeps the loop internally consistent/seamless regardless
-  // of how noisy any one individual detected beat position is.
-  const quantizedLoopLength = (startTime, beatCount) => {
+  // beat-to-beat. The local median interval (de-jittered) fixes that for
+  // multi-beat loops, but for a SHORT loop (especially exactly 1 beat) a
+  // pure average can land a few tens of ms past the real next beat -
+  // enough to fully swallow that beat's hit into what was meant to be a
+  // single-beat loop (verified: 70ms overshoot on a real track). Getting
+  // the actual end time from estimateLoopEnd prefers the real detected
+  // position when it's plausible, and only falls back to the average when
+  // that real position is a genuine outlier.
+  const getLoopEndTime = (startTime, beatCount) => {
     const beatgrid = getBeatgrid();
     if (beatgrid.length > 1) {
       const startIdx = findNearestBeatIndex(beatgrid, startTime);
-      const interval = estimateLocalBeatInterval(beatgrid, startIdx);
-      if (interval) return interval * beatCount;
+      const end = estimateLoopEnd(beatgrid, startIdx, beatCount);
+      if (end != null) return end;
     }
-    return track?.bpm ? (60 / track.bpm) * beatCount : null;
+    return track?.bpm ? startTime + (60 / track.bpm) * beatCount : null;
   };
 
   const handleLoopOut = () => {
@@ -503,11 +506,14 @@ const TrackPlayer = ({ track, onClose }) => {
       setLoop({ start: loop.start, end: now });
       return;
     }
-    const rawLength = now - loop.start;
-    const interval = quantizedLoopLength(loop.start, 1);
+    const beatgrid = getBeatgrid();
+    const startIdx = findNearestBeatIndex(beatgrid, loop.start);
+    const interval = estimateLocalBeatInterval(beatgrid, startIdx) || (track?.bpm ? 60 / track.bpm : null);
     if (!interval) return;
-    const beatCount = Math.max(1, Math.round(rawLength / interval));
-    setLoop({ start: loop.start, end: loop.start + interval * beatCount });
+    const beatCount = Math.max(1, Math.round((now - loop.start) / interval));
+    const end = getLoopEndTime(loop.start, beatCount);
+    if (!end || end <= loop.start) return;
+    setLoop({ start: loop.start, end });
   };
 
   // Single physical button: creates an instant 4-beat loop from the
@@ -521,9 +527,9 @@ const TrackPlayer = ({ track, onClose }) => {
     const now = getPlaybackTime();
     if (quantize) {
       const start = quantizePoint(now);
-      const length = quantizedLoopLength(start, 4);
-      if (length) {
-        setLoop({ start, end: start + length });
+      const end = getLoopEndTime(start, 4);
+      if (end) {
+        setLoop({ start, end });
         return;
       }
     }

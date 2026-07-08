@@ -300,18 +300,27 @@ class TrackAnalyzer:
     def detect_key(self) -> Tuple[str, str]:
         """
         Detect musical key using chromagram analysis, with a targeted
-        tie-break for relative major/minor confusion (e.g. F minor vs its
-        relative major Ab/G#). Those pairs share the exact same 7 notes,
-        so a whole-track pitch-class average frequently can't separate
-        them - verified on a real track where the two candidates were a
-        near-exact tie (correlation differing by 0.0005) and the wrong one
-        won, because the loudest section (a drop leaning on the relative
-        major's bIII chord) dominates the RMS-weighted average. The intro
-        almost always establishes the true tonic before that happens, so
-        it's used to break ties - but ONLY when there's a genuine
-        relative-key ambiguity, to avoid changing anything for the (much
-        more common) tracks where the whole-track correlation is already
-        decisive.
+        tie-break for two distinct kinds of major/minor confusion:
+
+        - Relative pairs (e.g. F minor vs its relative major Ab/G#), which
+          share the exact same 7 notes, so a whole-track pitch-class
+          average frequently can't separate them - verified on a real
+          track where the two candidates were a near-exact tie
+          (correlation differing by 0.0005) and the wrong one won, because
+          the loudest section (a drop leaning on the relative major's
+          bIII chord) dominates the RMS-weighted average.
+        - Parallel pairs (e.g. D# major vs D# minor - same tonic, third
+          degree undecided), which a whole-track average can also get
+          wrong for the same reason: verified on a real track where the
+          whole-track correlation favored major by a thin 0.018 margin,
+          but the intro alone - before a drop that leaned harder on the
+          major third - favored minor by 0.029.
+
+        In both cases the intro almost always establishes the true tonic
+        (and its true third) before a drop muddies things, so it's used
+        to break ties - but ONLY when there's a genuine ambiguity, to
+        avoid changing anything for the (much more common) tracks where
+        the whole-track correlation is already decisive.
         """
         print("Detecting musical key...")
 
@@ -330,9 +339,10 @@ class TrackAnalyzer:
         RELATIVE_KEY_SEMITONES = 3
         AMBIGUITY_MARGIN = 0.03
         is_relative_pair = (best_major_idx - best_minor_idx) % 12 == RELATIVE_KEY_SEMITONES
+        is_parallel_pair = best_major_idx == best_minor_idx
         is_ambiguous = abs(best_major_score - best_minor_score) < AMBIGUITY_MARGIN
 
-        if is_relative_pair and is_ambiguous:
+        if (is_relative_pair or is_parallel_pair) and is_ambiguous:
             intro_end = int(0.25 * len(self.y))
             if intro_end > self.sr * 2:
                 intro_major, intro_minor = self._chroma_key_correlations(self.y[:intro_end])
@@ -340,7 +350,8 @@ class TrackAnalyzer:
                     self.key, self.mode = self.key_mapping[best_major_idx], 'major'
                 else:
                     self.key, self.mode = self.key_mapping[best_minor_idx], 'minor'
-                print(f"  Relative-key ambiguity ({self.key_mapping[best_major_idx]} major vs "
+                pair_type = 'Relative' if is_relative_pair else 'Parallel'
+                print(f"  {pair_type}-key ambiguity ({self.key_mapping[best_major_idx]} major vs "
                       f"{self.key_mapping[best_minor_idx]} minor were nearly tied) - "
                       f"resolved using the track's intro: {self.key} {self.mode}")
 

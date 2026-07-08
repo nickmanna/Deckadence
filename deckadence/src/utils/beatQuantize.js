@@ -66,3 +66,40 @@ export function estimateLocalBeatInterval(beatgrid, index, window = 16) {
     ? (intervals[mid - 1] + intervals[mid]) / 2
     : intervals[mid];
 }
+
+// Above this, a real beat position's disagreement with the smoothed
+// estimate is treated as a genuine tracking discrepancy rather than
+// ordinary frame-quantization noise (verified against real analyzed
+// tracks: normal per-beat noise tops out around 3 analysis frames, ~35ms
+// at the backend's hop length; a real "stable tempo" track rarely exceeds
+// that, while a track with genuinely more local timing variation does).
+const LOOP_END_OUTLIER_THRESHOLD = 0.04;
+
+/**
+ * Where a loop that starts at beatgrid[startIndex] and spans `beatCount`
+ * beats should end.
+ *
+ * The smoothed local interval (see estimateLocalBeatInterval) is a de-
+ * jittered length, which is exactly right for keeping a loop's own
+ * repeats consistent - but for a SHORT loop (especially 1 beat), using a
+ * pure average instead of the real position of the very next beat can
+ * make the loop a few tens of ms too long, which is enough to fully
+ * contain that next beat's transient too (verified on a real track: a
+ * 1-beat loop landed 70ms past the real next beat, so what was meant to
+ * loop a single beat instead played that beat's hit AND the following
+ * one, every repeat). The real detected position is only "wrong" for
+ * this purpose when it's a genuine outlier - otherwise it's a more
+ * precise answer than an average, since it's tied to where the analyzer
+ * actually found that specific beat.
+ */
+export function estimateLoopEnd(beatgrid, startIndex, beatCount) {
+  const interval = estimateLocalBeatInterval(beatgrid, startIndex);
+  if (interval == null) return null;
+
+  const smoothedEnd = beatgrid[startIndex] + interval * beatCount;
+  const realEnd = beatgrid[startIndex + beatCount];
+  if (realEnd != null && Math.abs(realEnd - smoothedEnd) < LOOP_END_OUTLIER_THRESHOLD) {
+    return realEnd;
+  }
+  return smoothedEnd;
+}
