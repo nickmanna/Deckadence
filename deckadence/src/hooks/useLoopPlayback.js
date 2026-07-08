@@ -18,6 +18,49 @@ import { useCallback, useRef } from 'react';
  * only while a loop is actually active - normal playback stays on the
  * plain <audio> element.
  */
+// Splicing the loop boundary at an exact sample (native loopStart/loopEnd)
+// jumps straight from whatever amplitude the waveform happens to be at
+// loopEnd to whatever it happens to be at loopStart. On percussive or
+// vocal content those two points are almost never at the same amplitude,
+// and that instantaneous jump is an audible click/pop on every repeat -
+// independent of how accurately loopStart/loopEnd are placed on the
+// beatgrid. Building the loop as its own short buffer and blending
+// (equal-power) the last few ms of the segment's tail against its own
+// head fixes the discontinuity: the seam is smoothed audio instead of a
+// hard edge. 10ms is short enough to stay under the threshold where a
+// pre-echo of the head becomes a separately audible event, even for a
+// short 1-beat loop, while still being enough samples to mask a typical
+// waveform-amplitude jump.
+const LOOP_CROSSFADE_SECONDS = 0.01;
+
+function buildLoopSegment(ctx, buffer, loopStart, loopEnd) {
+  const sr = buffer.sampleRate;
+  const startSample = Math.max(0, Math.round(loopStart * sr));
+  const endSample = Math.min(buffer.length, Math.round(loopEnd * sr));
+  const length = endSample - startSample;
+  if (length <= 0) return null;
+
+  // Capped at a quarter of the loop's own length so the fade can't eat
+  // into more of the segment than exists on very short (sub-beat) loops.
+  const fadeSamples = Math.min(Math.round(LOOP_CROSSFADE_SECONDS * sr), Math.floor(length / 4));
+  const segment = ctx.createBuffer(buffer.numberOfChannels, length, sr);
+
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const out = segment.getChannelData(ch);
+    out.set(src.subarray(startSample, endSample));
+
+    for (let i = 0; i < fadeSamples; i++) {
+      const t = i / fadeSamples;
+      const fadeOut = Math.cos((t * Math.PI) / 2);
+      const fadeIn = Math.sin((t * Math.PI) / 2);
+      const tailIdx = length - fadeSamples + i;
+      out[tailIdx] = src[startSample + tailIdx] * fadeOut + src[startSample + i] * fadeIn;
+    }
+  }
+  return segment;
+}
+
 export function useLoopPlayback() {
   const audioContextRef = useRef(null);
   const audioBufferRef = useRef(null);
@@ -87,11 +130,15 @@ export function useLoopPlayback() {
     const ctx = getContext();
     if (ctx.state === 'suspended') ctx.resume();
 
+    // Loop a self-contained, seam-crossfaded copy of [loopStart, loopEnd)
+    // rather than using the full track buffer's native loopStart/loopEnd -
+    // see buildLoopSegment for why (declicking the wrap point).
+    const segment = buildLoopSegment(ctx, buffer, loopStart, loopEnd);
+    if (!segment) return false;
+
     const source = ctx.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = segment;
     source.loop = true;
-    source.loopStart = loopStart;
-    source.loopEnd = loopEnd;
     source.playbackRate.value = opts.playbackRate ?? 1;
 
     const gain = ctx.createGain();
@@ -100,7 +147,7 @@ export function useLoopPlayback() {
     gain.connect(ctx.destination);
 
     const playFrom = fromTime >= loopStart && fromTime < loopEnd ? fromTime : loopStart;
-    source.start(0, playFrom);
+    source.start(0, playFrom - loopStart);
 
     sourceNodeRef.current = source;
     gainNodeRef.current = gain;
