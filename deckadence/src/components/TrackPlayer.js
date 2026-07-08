@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Waveform from './Waveform';
 import { TrackService } from '../services/trackService';
 import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
+import { useLoopPlayback } from '../hooks/useLoopPlayback';
 import { estimateLocalBeatInterval, findNearestBeatIndex, quantizeTimeToBeat } from '../utils/beatQuantize';
 import './TrackPlayer.css';
 
@@ -22,6 +23,7 @@ const TrackPlayer = ({ track, onClose }) => {
   const [zoomLevel, setZoomLevel] = useState(1.0); // Initial zoom level (1x)
   const [viewMode, setViewMode] = useState('traditional'); // 'traditional' or 'dj'
   const audioRef = useRef(null);
+  const loopPlayback = useLoopPlayback();
 
   // Handle jog wheel start
   const handleJogStart = useCallback(() => {
@@ -39,12 +41,17 @@ const TrackPlayer = ({ track, onClose }) => {
     }
   }, [isPlaying]);
 
-  // Handle seek to specific time
+  // Manually seeking (e.g. clicking the waveform) always breaks out of an
+  // active loop - continuing to enforce old loop bounds after the user
+  // explicitly jumped elsewhere would be surprising.
   const handleSeekToTime = useCallback((newTime) => {
+    loopPlayback.stop();
+    setLoop({ start: null, end: null });
     if (audioRef.current) {
       audioRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadID3Tags = (file) => {
@@ -270,6 +277,8 @@ const TrackPlayer = ({ track, onClose }) => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
+    loopPlayback.setVolume(volume);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume]);
 
   useEffect(() => {
@@ -309,14 +318,7 @@ const TrackPlayer = ({ track, onClose }) => {
     }
   }, [playbackRate]);
 
-  const togglePlay = () => {
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
+  const togglePlay = () => setIsPlaying((p) => !p);
 
   // Reset cue/loop state whenever a different track is loaded.
   useEffect(() => {
@@ -324,6 +326,96 @@ const TrackPlayer = ({ track, onClose }) => {
     setLoop({ start: null, end: null });
     cuePreviewRef.current = false;
   }, [track]);
+
+  // Single place that decides which engine actually drives playback.
+  // Normal playback stays on the <audio> element; while a loop is active
+  // AND playing, hand off to Web Audio's sample-accurate native looping
+  // (see useLoopPlayback) instead of polling audio.currentTime, which
+  // can't be checked/corrected any faster than requestAnimationFrame
+  // allows (~16ms at 60Hz) - on a real analyzed track that was enough
+  // overshoot past the loop-out point to audibly hear the next beat
+  // bleed in before snapping back.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return undefined;
+    const loopActive = loop.start != null && loop.end != null;
+
+    if (isPlaying && loopActive) {
+      let cancelled = false;
+      const fromTime = loopPlayback.isActive() ? (loopPlayback.getCurrentTime() ?? audio.currentTime) : audio.currentTime;
+      audio.pause();
+      const url = audio.currentSrc || audio.src;
+      loopPlayback.start(url, loop.start, loop.end, fromTime, { volume, playbackRate }).then((ok) => {
+        if (cancelled || ok) return;
+        // Web Audio decode failed (e.g. CORS) - fall back to ordinary
+        // <audio> playback. The loop still works, just with the original
+        // (less precise) rAF-based enforcement below.
+        audio.currentTime = fromTime >= loop.start && fromTime < loop.end ? fromTime : loop.start;
+        audio.play().catch(console.error);
+      });
+      return () => {
+        cancelled = true;
+        if (loopPlayback.isActive()) {
+          const t = loopPlayback.getCurrentTime();
+          loopPlayback.stop();
+          if (t != null) audio.currentTime = t;
+        }
+      };
+    }
+
+    if (isPlaying && audio.paused) {
+      audio.play().catch(console.error);
+    } else if (!isPlaying && !audio.paused) {
+      audio.pause();
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, loop.start, loop.end, playbackRate]);
+
+  // Fallback rAF-based loop enforcement for when Web Audio decode isn't
+  // available - imprecise (same overshoot as before) but keeps looping
+  // functional rather than breaking entirely.
+  useEffect(() => {
+    if (!isPlaying || loop.start == null || loop.end == null) return undefined;
+    let raf;
+    const checkLoop = () => {
+      const audio = audioRef.current;
+      if (audio && !loopPlayback.isActive() && !audio.paused && audio.currentTime >= loop.end) {
+        audio.currentTime = loop.start;
+      }
+      raf = requestAnimationFrame(checkLoop);
+    };
+    raf = requestAnimationFrame(checkLoop);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, loop.start, loop.end]);
+
+  // Drive the waveform playhead from the Web Audio clock while a loop is
+  // actively playing there, since the <audio> element is paused (and so
+  // stops emitting timeupdate events) for the duration of the loop.
+  useEffect(() => {
+    if (!isPlaying || loop.start == null || loop.end == null) return undefined;
+    let raf;
+    const update = () => {
+      const t = loopPlayback.getCurrentTime();
+      if (t != null) setCurrentTime(t);
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, loop.start, loop.end]);
+
+  // Correct current-position read regardless of which engine is driving
+  // playback right now - used anywhere a handler needs "where are we
+  // actually playing from" (cue/loop point placement).
+  const getPlaybackTime = () => {
+    if (loopPlayback.isActive()) {
+      const t = loopPlayback.getCurrentTime();
+      if (t != null) return t;
+    }
+    return audioRef.current ? audioRef.current.currentTime : 0;
+  };
 
   // Getting this from track props fresh each call (rather than useMemo)
   // keeps it trivially in sync if the track prop ever changes underneath
@@ -346,19 +438,25 @@ const TrackPlayer = ({ track, onClose }) => {
     const audio = audioRef.current;
     if (!audio) return;
     if (isPlaying) {
+      // Pressing CUE always wins over an active loop - jump to the cue
+      // point rather than leaving a Web Audio loop node running under a
+      // now-stale <audio> position.
+      if (loopPlayback.isActive()) loopPlayback.stop();
+      if (loop.start != null || loop.end != null) setLoop({ start: null, end: null });
       audio.pause();
       audio.currentTime = cuePoint;
       setCurrentTime(cuePoint);
       setIsPlaying(false);
       return;
     }
-    const atCue = Math.abs(audio.currentTime - cuePoint) < 0.05;
+    const atCue = Math.abs(getPlaybackTime() - cuePoint) < 0.05;
     if (atCue) {
       cuePreviewRef.current = true;
+      audio.currentTime = cuePoint;
       audio.play().catch(console.error);
       setIsPlaying(true);
     } else {
-      setCuePoint(quantizePoint(audio.currentTime));
+      setCuePoint(quantizePoint(getPlaybackTime()));
     }
   };
 
@@ -375,9 +473,7 @@ const TrackPlayer = ({ track, onClose }) => {
   };
 
   const handleLoopIn = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    setLoop({ start: quantizePoint(audio.currentTime), end: null });
+    setLoop({ start: quantizePoint(getPlaybackTime()), end: null });
   };
 
   // A loop's length is the difference of two beat positions, so unlike a
@@ -400,15 +496,14 @@ const TrackPlayer = ({ track, onClose }) => {
   };
 
   const handleLoopOut = () => {
-    const audio = audioRef.current;
-    if (!audio || loop.start == null) return;
+    if (loop.start == null) return;
+    const now = getPlaybackTime();
     if (!quantize) {
-      const end = audio.currentTime;
-      if (end <= loop.start) return;
-      setLoop({ start: loop.start, end });
+      if (now <= loop.start) return;
+      setLoop({ start: loop.start, end: now });
       return;
     }
-    const rawLength = audio.currentTime - loop.start;
+    const rawLength = now - loop.start;
     const interval = quantizedLoopLength(loop.start, 1);
     if (!interval) return;
     const beatCount = Math.max(1, Math.round(rawLength / interval));
@@ -419,14 +514,13 @@ const TrackPlayer = ({ track, onClose }) => {
   // current position when nothing is looping, exits the active loop
   // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling.
   const handleLoop4BeatOrExit = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
     if (loop.start != null && loop.end != null) {
       setLoop({ start: null, end: null });
       return;
     }
+    const now = getPlaybackTime();
     if (quantize) {
-      const start = quantizePoint(audio.currentTime);
+      const start = quantizePoint(now);
       const length = quantizedLoopLength(start, 4);
       if (length) {
         setLoop({ start, end: start + length });
@@ -435,8 +529,7 @@ const TrackPlayer = ({ track, onClose }) => {
     }
     if (!track?.bpm) return;
     const beatLength = 60 / track.bpm;
-    const start = audio.currentTime;
-    setLoop({ start, end: start + beatLength * 4 });
+    setLoop({ start: now, end: now + beatLength * 4 });
   };
 
   const handleLoopCallLeft = () => {
@@ -450,23 +543,6 @@ const TrackPlayer = ({ track, onClose }) => {
     if (loop.start == null || loop.end == null) return;
     setLoop({ start: loop.start, end: loop.start + (loop.end - loop.start) * 2 });
   };
-
-  // Enforce the active loop with requestAnimationFrame rather than the
-  // audio element's own (coarse, browser-throttled) timeupdate event, so
-  // the loop-back is tight enough to actually be usable for DJ mixing.
-  useEffect(() => {
-    if (!isPlaying || loop.start == null || loop.end == null) return undefined;
-    let raf;
-    const checkLoop = () => {
-      const audio = audioRef.current;
-      if (audio && audio.currentTime >= loop.end) {
-        audio.currentTime = loop.start;
-      }
-      raf = requestAnimationFrame(checkLoop);
-    };
-    raf = requestAnimationFrame(checkLoop);
-    return () => cancelAnimationFrame(raf);
-  }, [isPlaying, loop.start, loop.end]);
 
   const midiStatus = useDdjFlx4Controller({
     onPlayPause: togglePlay,
