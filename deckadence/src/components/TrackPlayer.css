@@ -268,6 +268,29 @@
   transform: scale(1.05);
 }
 
+.cue-btn {
+  background: #444;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 6px;
+  width: 52px;
+  height: 52px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cue-btn:hover {
+  border-color: #FF9500;
+}
+
+.cue-btn:active {
+  background: #FF9500;
+  color: #1a1a1a;
+}
+
 .time-display {
   display: flex;
   align-items: center;
@@ -276,6 +299,58 @@
   font-family: 'Courier New', monospace;
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.midi-status {
+  margin-left: auto;
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.midi-status.connected {
+  color: #4ecdc4;
+}
+
+.loop-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.control-label-text {
+  color: #ccc;
+  font-size: 0.9rem;
+  min-width: 40px;
+}
+
+.loop-btn {
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.loop-btn:hover:not(:disabled) {
+  background: #555;
+  color: #fff;
+  border-color: #FF9500;
+}
+
+.loop-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.loop-length {
+  color: #FF9500;
+  font-size: 0.85rem;
+  font-family: 'Courier New', monospace;
 }
 
 .secondary-controls {

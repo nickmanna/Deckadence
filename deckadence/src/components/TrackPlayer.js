@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Waveform from './Waveform';
 import { TrackService } from '../services/trackService';
+import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
 import './TrackPlayer.css';
 
 const TrackPlayer = ({ track, onClose }) => {
@@ -8,6 +9,9 @@ const TrackPlayer = ({ track, onClose }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
+  const [cuePoint, setCuePoint] = useState(0);
+  const [loop, setLoop] = useState({ start: null, end: null });
+  const cuePreviewRef = useRef(false);
   const [showWaveform, setShowWaveform] = useState(true);
   const [showBeatgrid, setShowBeatgrid] = useState(true);
   const [playbackRate, setPlaybackRate] = useState(1.0);
@@ -312,6 +316,119 @@ const TrackPlayer = ({ track, onClose }) => {
     setIsPlaying(!isPlaying);
   };
 
+  // Reset cue/loop state whenever a different track is loaded.
+  useEffect(() => {
+    setCuePoint(0);
+    setLoop({ start: null, end: null });
+    cuePreviewRef.current = false;
+  }, [track]);
+
+  // Standard CDJ-style CUE behavior:
+  // - pressed while playing: stop and jump back to the cue point.
+  // - pressed while paused, already at the cue point: preview-play for as
+  //   long as the button is held.
+  // - pressed while paused elsewhere (e.g. after seeking on the waveform):
+  //   drop a new cue point at the current position.
+  const handleCuePress = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      audio.currentTime = cuePoint;
+      setCurrentTime(cuePoint);
+      setIsPlaying(false);
+      return;
+    }
+    const atCue = Math.abs(audio.currentTime - cuePoint) < 0.05;
+    if (atCue) {
+      cuePreviewRef.current = true;
+      audio.play().catch(console.error);
+      setIsPlaying(true);
+    } else {
+      setCuePoint(audio.currentTime);
+    }
+  };
+
+  const handleCueRelease = () => {
+    if (!cuePreviewRef.current) return;
+    cuePreviewRef.current = false;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = cuePoint;
+      setCurrentTime(cuePoint);
+    }
+    setIsPlaying(false);
+  };
+
+  const handleLoopIn = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setLoop({ start: audio.currentTime, end: null });
+  };
+
+  const handleLoopOut = () => {
+    const audio = audioRef.current;
+    if (!audio || loop.start == null || audio.currentTime <= loop.start) return;
+    setLoop({ start: loop.start, end: audio.currentTime });
+  };
+
+  // Single physical button: creates an instant 4-beat loop from the
+  // current position when nothing is looping, exits the active loop
+  // otherwise - matches the DDJ-FLX4's "4 BEAT / EXIT" labeling.
+  const handleLoop4BeatOrExit = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (loop.start != null && loop.end != null) {
+      setLoop({ start: null, end: null });
+      return;
+    }
+    if (!track?.bpm) return;
+    const beatLength = 60 / track.bpm;
+    const start = audio.currentTime;
+    setLoop({ start, end: start + beatLength * 4 });
+  };
+
+  const handleLoopCallLeft = () => {
+    if (loop.start == null || loop.end == null) return;
+    const newLength = (loop.end - loop.start) / 2;
+    if (newLength < 0.05) return;
+    setLoop({ start: loop.start, end: loop.start + newLength });
+  };
+
+  const handleLoopCallRight = () => {
+    if (loop.start == null || loop.end == null) return;
+    setLoop({ start: loop.start, end: loop.start + (loop.end - loop.start) * 2 });
+  };
+
+  // Enforce the active loop with requestAnimationFrame rather than the
+  // audio element's own (coarse, browser-throttled) timeupdate event, so
+  // the loop-back is tight enough to actually be usable for DJ mixing.
+  useEffect(() => {
+    if (!isPlaying || loop.start == null || loop.end == null) return undefined;
+    let raf;
+    const checkLoop = () => {
+      const audio = audioRef.current;
+      if (audio && audio.currentTime >= loop.end) {
+        audio.currentTime = loop.start;
+      }
+      raf = requestAnimationFrame(checkLoop);
+    };
+    raf = requestAnimationFrame(checkLoop);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, loop.start, loop.end]);
+
+  const midiStatus = useDdjFlx4Controller({
+    onPlayPause: togglePlay,
+    onCuePress: handleCuePress,
+    onCueRelease: handleCueRelease,
+    onLoopIn: handleLoopIn,
+    onLoopOut: handleLoopOut,
+    onLoop4BeatOrExit: handleLoop4BeatOrExit,
+    onLoopCallLeft: handleLoopCallLeft,
+    onLoopCallRight: handleLoopCallRight,
+  });
+
   const handleVolumeChange = (e) => {
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
@@ -446,23 +563,56 @@ const TrackPlayer = ({ track, onClose }) => {
             onJogStart={handleJogStart}
             onJogEnd={handleJogEnd}
             isPlaying={isPlaying}
+            cuePoint={cuePoint}
+            loop={loop}
           />
 
           {/* Playback Controls */}
           <div className="playback-controls">
             <div className="main-controls">
-              <button 
+              <button
                 className="play-btn"
                 onClick={togglePlay}
               >
                 {isPlaying ? '⏸️' : '▶️'}
               </button>
-              
+
+              <button
+                className="cue-btn"
+                onMouseDown={handleCuePress}
+                onMouseUp={handleCueRelease}
+                onMouseLeave={handleCueRelease}
+              >
+                CUE
+              </button>
+
               <div className="time-display">
                 <span>{formatTime(currentTime)}</span>
                 <span>/</span>
                 <span>{formatTime(duration)}</span>
               </div>
+
+              <span className={`midi-status ${midiStatus.connected ? 'connected' : ''}`}>
+                {midiStatus.connected
+                  ? `🎛️ ${midiStatus.deviceName}`
+                  : midiStatus.supported
+                    ? 'No MIDI controller connected'
+                    : 'MIDI not supported in this browser'}
+              </span>
+            </div>
+
+            <div className="loop-controls">
+              <span className="control-label-text">Loop:</span>
+              <button className="loop-btn" onClick={handleLoopIn}>IN</button>
+              <button className="loop-btn" onClick={handleLoopOut} disabled={loop.start == null}>OUT</button>
+              <button className="loop-btn" onClick={handleLoop4BeatOrExit}>
+                {loop.start != null && loop.end != null ? 'EXIT' : '4 BEAT'}
+              </button>
+              <button className="loop-btn" onClick={handleLoopCallLeft} disabled={loop.end == null}>◁ 1/2</button>
+              <button className="loop-btn" onClick={handleLoopCallRight} disabled={loop.end == null}>▷ x2</button>
+              {loop.start != null && loop.end != null && (
+                <span className="loop-length">{(loop.end - loop.start).toFixed(2)}s</span>
+              )}
             </div>
 
             <div className="secondary-controls">

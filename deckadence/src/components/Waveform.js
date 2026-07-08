@@ -35,7 +35,9 @@ const Waveform = ({
   onSeekToTime,
   onJogStart,
   onJogEnd,
-  isPlaying = false
+  isPlaying = false,
+  cuePoint = 0,
+  loop = { start: null, end: null }
 }) => {
   const canvasRef = useRef(null);
   const djCanvasRef = useRef(null);
@@ -95,6 +97,33 @@ const Waveform = ({
     });
   }, [showBeatgrid, beatgrid, downbeatOffset]);
 
+  // Cue point marker plus a shaded region for the active loop, if any.
+  const drawCueAndLoop = useCallback((ctx, width, height, timeToX) => {
+    if (loop.start != null && loop.end != null) {
+      const x1 = timeToX(loop.start);
+      const x2 = timeToX(loop.end);
+      if (x2 >= 0 && x1 <= width) {
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = 'rgba(255, 149, 0, 0.2)';
+        ctx.fillRect(x1, 0, x2 - x1, height);
+        ctx.strokeStyle = '#FF9500';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x1, 0, x2 - x1, height);
+      }
+    }
+
+    const cueX = timeToX(cuePoint);
+    if (cueX >= 0 && cueX <= width) {
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = '#FF9500';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cueX, 0);
+      ctx.lineTo(cueX, height);
+      ctx.stroke();
+    }
+  }, [cuePoint, loop]);
+
   // Traditional view: the whole track, drawn once per frame as a single
   // amplitude silhouette colored per-point by frequency content.
   const drawTraditionalWaveform = useCallback((time) => {
@@ -135,6 +164,7 @@ const Waveform = ({
     }
 
     drawBeatgrid(ctx, width, height, timeToX);
+    drawCueAndLoop(ctx, width, height, timeToX);
 
     ctx.globalAlpha = 1.0;
     ctx.strokeStyle = '#4ecdc4';
@@ -144,7 +174,7 @@ const Waveform = ({
     ctx.moveTo(playheadX, 0);
     ctx.lineTo(playheadX, height);
     ctx.stroke();
-  }, [points, duration, showWaveform, drawBeatgrid]);
+  }, [points, duration, showWaveform, drawBeatgrid, drawCueAndLoop]);
 
   // DJ view: zoomed, scrolls under a fixed center playhead.
   const drawDJWaveform = useCallback((time) => {
@@ -189,6 +219,7 @@ const Waveform = ({
     }
 
     drawBeatgrid(ctx, width, height, timeToX);
+    drawCueAndLoop(ctx, width, height, timeToX);
 
     ctx.globalAlpha = 1.0;
     ctx.strokeStyle = '#4ecdc4';
@@ -197,7 +228,7 @@ const Waveform = ({
     ctx.moveTo(width / 2, 0);
     ctx.lineTo(width / 2, height);
     ctx.stroke();
-  }, [points, duration, zoomLevel, showWaveform, drawBeatgrid]);
+  }, [points, duration, zoomLevel, showWaveform, drawBeatgrid, drawCueAndLoop]);
 
   // Smoothly interpolate the DJ view's playhead between currentTime prop
   // updates (which only arrive on the audio element's own timeupdate
