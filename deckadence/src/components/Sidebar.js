@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { to: '/games', label: 'Games', flag: 'games' }
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ collapsed, onToggleCollapsed }) => {
   const { currentUser, logout } = useAuth();
   const [authMode, setAuthMode] = useState(null); // null | 'signin' | 'signup'
 
@@ -27,10 +27,31 @@ const Sidebar = () => {
 
   return (
     <>
-      <aside className="sidebar">
-        <Link to="/" className="sidebar-brand">
-          Deckadence
-        </Link>
+      {collapsed && (
+        <button
+          className="sidebar-reopen-btn"
+          onClick={onToggleCollapsed}
+          title="Show sidebar"
+          aria-label="Show sidebar"
+        >
+          »
+        </button>
+      )}
+
+      <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <Link to="/" className="sidebar-brand">
+            Deckadence
+          </Link>
+          <button
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapsed}
+            title="Hide sidebar"
+            aria-label="Hide sidebar"
+          >
+            «
+          </button>
+        </div>
 
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => {
