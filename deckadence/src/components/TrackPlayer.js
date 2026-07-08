@@ -327,6 +327,23 @@ const TrackPlayer = ({ track, onClose }) => {
     cuePreviewRef.current = false;
   }, [track]);
 
+  // TEMPORARY debug instrumentation for diagnosing beatgrid irregularity -
+  // remove once the loop-stutter investigation is done. Logs every beat
+  // time plus its interval to the previous beat, so a specific range can
+  // be pasted back for inspection instead of eyeballing pixel spacing in
+  // a screenshot.
+  useEffect(() => {
+    const grid = track?.beatgrid || track?.beatGrid || [];
+    if (grid.length === 0) return;
+    const rows = grid.map((t, i) => ({
+      index: i,
+      time: Number(t.toFixed(4)),
+      intervalMs: i > 0 ? Math.round((t - grid[i - 1]) * 1000) : null,
+    }));
+    console.log(`[beatgrid-debug] ${track?.title || 'track'}: ${grid.length} beats, bpm=${track?.bpm}`);
+    console.table(rows);
+  }, [track]);
+
   // Single place that decides which engine actually drives playback.
   // Normal playback stays on the <audio> element; while a loop is active
   // AND playing, hand off to Web Audio's sample-accurate native looping
