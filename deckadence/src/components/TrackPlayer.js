@@ -538,16 +538,45 @@ const TrackPlayer = ({ track, onClose }) => {
     setLoop({ start: now, end: now + beatLength * 4 });
   };
 
+  // Halving/doubling by pure arithmetic on the loop length compounds
+  // exactly the averaging error estimateLoopEnd exists to avoid: a 4-beat
+  // loop's end is (correctly) allowed to land on the real detected beat
+  // position, but dividing that length by 4 to get "1 beat" treats it as
+  // a flat average across all 4 beats instead of the real position of the
+  // very next beat - reintroducing the "few tens of ms too long" overshoot
+  // that swallows the following beat's transient (see estimateLoopEnd).
+  // Re-deriving the new length from the beatgrid at each halve/double step
+  // keeps every whole-beat length exact instead of drifting toward the
+  // average. Sub-beat lengths (for stutter-loop effects) have no beatgrid
+  // position to snap to, so those still fall back to plain arithmetic.
+  const requantizedLoopEnd = (beatCount) => {
+    if (!Number.isInteger(beatCount) || beatCount < 1) return null;
+    return quantize ? getLoopEndTime(loop.start, beatCount) : null;
+  };
+
+  const currentLoopBeatCount = () => {
+    const beatgrid = getBeatgrid();
+    const startIdx = findNearestBeatIndex(beatgrid, loop.start);
+    const interval = estimateLocalBeatInterval(beatgrid, startIdx) || (track?.bpm ? 60 / track.bpm : null);
+    return interval ? (loop.end - loop.start) / interval : null;
+  };
+
   const handleLoopCallLeft = () => {
     if (loop.start == null || loop.end == null) return;
     const newLength = (loop.end - loop.start) / 2;
     if (newLength < 0.05) return;
-    setLoop({ start: loop.start, end: loop.start + newLength });
+    const beatCount = currentLoopBeatCount();
+    const halved = beatCount != null ? Math.round(beatCount) / 2 : null;
+    const end = requantizedLoopEnd(halved);
+    setLoop({ start: loop.start, end: end ?? loop.start + newLength });
   };
 
   const handleLoopCallRight = () => {
     if (loop.start == null || loop.end == null) return;
-    setLoop({ start: loop.start, end: loop.start + (loop.end - loop.start) * 2 });
+    const beatCount = currentLoopBeatCount();
+    const doubled = beatCount != null ? Math.round(beatCount) * 2 : null;
+    const end = requantizedLoopEnd(doubled);
+    setLoop({ start: loop.start, end: end ?? loop.start + (loop.end - loop.start) * 2 });
   };
 
   const midiStatus = useDdjFlx4Controller({
