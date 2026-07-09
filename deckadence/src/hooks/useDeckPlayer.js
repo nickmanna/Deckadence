@@ -94,7 +94,7 @@ const decodeID3Picture = (data) => {
  * (TrackPlayer's case, with no external mixer) and the hook manages its
  * own volume state via the returned setVolume, as before.
  */
-export function useDeckPlayer(track, { externalVolume } = {}) {
+export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -107,11 +107,20 @@ export function useDeckPlayer(track, { externalVolume } = {}) {
   const [loop, setLoop] = useState({ start: null, end: null });
   const [quantize, setQuantize] = useState(true);
   const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [syncEnabled, setSyncEnabled] = useState(false);
   const [id3Data, setId3Data] = useState(null);
   const [albumCover, setAlbumCover] = useState(null);
   const cuePreviewRef = useRef(false);
   const audioRef = useRef(null);
   const loopPlayback = useLoopPlayback();
+
+  // Read fresh every render rather than memoized - GreenRoom recomputes
+  // which deck is the current sync target on every render (it depends on
+  // every other deck's live isPlaying/bpm), so a stale closure here would
+  // keep syncing against whichever deck happened to be the target when
+  // this callback was first created.
+  const getSyncTargetRef = useRef(getSyncTarget);
+  getSyncTargetRef.current = getSyncTarget;
 
   const handleJogStart = useCallback(() => {
     if (audioRef.current && !audioRef.current.paused) {
@@ -257,10 +266,13 @@ export function useDeckPlayer(track, { externalVolume } = {}) {
 
   const togglePlay = useCallback(() => setIsPlaying((p) => !p), []);
 
-  // Reset cue/loop state whenever a different track is loaded.
+  // Reset cue/loop/sync state whenever a different track is loaded - a
+  // sync lock (and its matched tempo) is meaningless once the track it was
+  // computed against is gone.
   useEffect(() => {
     setCuePoint(0);
     setLoop({ start: null, end: null });
+    setSyncEnabled(false);
     cuePreviewRef.current = false;
   }, [track]);
 
@@ -358,6 +370,97 @@ export function useDeckPlayer(track, { externalVolume } = {}) {
   }, []);
 
   const getBeatgrid = useCallback(() => track?.beatgrid || track?.beatGrid || [], [track]);
+
+  // What this deck offers *other* decks that might want to sync to it -
+  // its current effective tempo (stored BPM adjusted by this deck's own
+  // pitch/sync rate, matching the jog wheel's live BPM readout) plus enough
+  // beatgrid/position info for a syncing deck to work out phase alignment.
+  const getSyncInfo = useCallback(() => ({
+    bpm: track?.bpm ? track.bpm * playbackRate : null,
+    beatgrid: getBeatgrid(),
+    currentTime: getPlaybackTime(),
+    isPlaying,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [track, playbackRate, getBeatgrid, isPlaying]);
+
+  // Matches this deck's tempo to whatever `getSyncTarget()` currently
+  // returns (the other deck GreenRoom has decided is the sync target -
+  // typically "the other deck that's currently playing"). Returns whether
+  // a target with a usable BPM was actually found, so callers (toggling
+  // sync on) know whether it's also worth snapping phase right now.
+  //
+  // Clamped to the same 0.9-1.1 range as the on-screen pitch slider -
+  // going further would move the deck's tempo somewhere the pitch fader
+  // can't even display/represent, and a BPM ratio that extreme almost
+  // always means the two tracks aren't a sensible pair to beatmatch anyway
+  // (e.g. a double/half-time mismatch) rather than something to force.
+  const applySyncTempo = useCallback(() => {
+    if (!track?.bpm) return false;
+    const target = getSyncTargetRef.current?.();
+    if (!target?.bpm) return false;
+    const rate = Math.min(1.1, Math.max(0.9, target.bpm / track.bpm));
+    setPlaybackRate(rate);
+    return true;
+  }, [track]);
+
+  // Snaps this deck's position so its nearest beat lines up with the sync
+  // target's nearest beat - a one-time phase correction, not something run
+  // on every poll tick (see the sync-follow effect below), matching how
+  // hardware/DJ-software sync behaves: tempo is tracked continuously, but
+  // phase is only re-snapped at the moment sync engages (or play resumes)
+  // rather than fighting the beat every tick, which would be audible as a
+  // constant wobble.
+  //
+  // Uses each deck's real detected beatgrid rather than an assumed constant
+  // interval, same reasoning as the rest of this file's beat math - two
+  // tracks' beats are only truly "aligned" relative to where each one's
+  // analyzer actually found them, not to an idealized grid.
+  const applySyncPhase = useCallback(() => {
+    const audio = audioRef.current;
+    const target = getSyncTargetRef.current?.();
+    if (!audio || !target?.beatgrid?.length || loopPlayback.isActive()) return;
+    const ownGrid = getBeatgrid();
+    if (ownGrid.length === 0) return;
+
+    const now = getPlaybackTime();
+    const ownOffset = now - ownGrid[findNearestBeatIndex(ownGrid, now)];
+    const targetOffset = target.currentTime - target.beatgrid[findNearestBeatIndex(target.beatgrid, target.currentTime)];
+
+    const newTime = now + (targetOffset - ownOffset);
+    if (newTime < 0 || (duration && newTime > duration)) return;
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getBeatgrid, getPlaybackTime, duration]);
+
+  const toggleSync = useCallback(() => {
+    setSyncEnabled((prev) => {
+      const next = !prev;
+      if (next && applySyncTempo() && isPlaying) applySyncPhase();
+      return next;
+    });
+  }, [applySyncTempo, applySyncPhase, isPlaying]);
+
+  // Continuously re-matches tempo while sync is on, so this deck tracks the
+  // target deck's tempo even as the target's own pitch (or its own sync)
+  // keeps moving - a plain interval rather than requestAnimationFrame since
+  // tempo doesn't need to be corrected any faster than roughly a few times
+  // a second to stay musically locked.
+  useEffect(() => {
+    if (!syncEnabled) return undefined;
+    const id = setInterval(applySyncTempo, 250);
+    return () => clearInterval(id);
+  }, [syncEnabled, applySyncTempo]);
+
+  // Re-snap phase whenever this deck (re)starts playing while sync is
+  // engaged - e.g. it was cued up while armed, or paused mid-track and
+  // resumed - so it lands back in phase instead of just carrying forward
+  // whatever offset it drifted to while stopped.
+  const wasPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    if (syncEnabled && isPlaying && !wasPlayingRef.current) applySyncPhase();
+    wasPlayingRef.current = isPlaying;
+  }, [isPlaying, syncEnabled, applySyncPhase]);
 
   // Manual loop/cue points landing a few ms off the real beat is exactly
   // what makes hand-set loops sound "off" on every repeat - snapping to
@@ -527,10 +630,11 @@ export function useDeckPlayer(track, { externalVolume } = {}) {
     volume, setVolume: setVolumeState,
     cuePoint, loop, quantize, setQuantize,
     playbackRate, setPlaybackRate,
+    syncEnabled, toggleSync,
     id3Data, albumCover,
     handleJogStart, handleJogEnd, handleSeekToTime,
     handleCuePress, handleCueRelease,
     handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight,
-    getPlaybackTime, getBeatgrid,
+    getPlaybackTime, getBeatgrid, getSyncInfo,
   };
 }

@@ -29,6 +29,7 @@ const Deck = forwardRef(({
   deckNumber, track, volume, zoomLevel, side = 'left',
   waveformRow, controlsRow, controlsColumn,
   onDragOver, onDragLeave, onDrop,
+  getSyncTarget,
 }, ref) => {
   const {
     audioRef,
@@ -36,10 +37,12 @@ const Deck = forwardRef(({
     currentTime, duration,
     cuePoint, loop, quantize, setQuantize,
     playbackRate, setPlaybackRate,
+    syncEnabled, toggleSync,
     handleJogStart, handleJogEnd, handleSeekToTime,
     handleCuePress, handleCueRelease,
     handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight,
-  } = useDeckPlayer(track, { externalVolume: volume });
+    getSyncInfo,
+  } = useDeckPlayer(track, { externalVolume: volume, getSyncTarget });
 
   useImperativeHandle(ref, () => ({
     togglePlay,
@@ -51,7 +54,8 @@ const Deck = forwardRef(({
     handleLoopCallLeft,
     handleLoopCallRight,
     setPlaybackRate,
-  }), [togglePlay, handleCuePress, handleCueRelease, handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight, setPlaybackRate]);
+    getSyncInfo,
+  }), [togglePlay, handleCuePress, handleCueRelease, handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight, setPlaybackRate, getSyncInfo]);
 
   // The jog wheel's readout is the track's stored BPM adjusted live by the
   // pitch fader, exactly like a real deck's tempo display - not the raw
@@ -128,6 +132,14 @@ const Deck = forwardRef(({
             >
               CUE
             </button>
+            <button
+              className={`deck-btn deck-sync-btn ${syncEnabled ? 'active' : ''}`}
+              onClick={toggleSync}
+              title="Match this deck's tempo and beat phase to whichever other deck is playing"
+              disabled={!track}
+            >
+              SYNC
+            </button>
             <div className="deck-loop-controls">
               <button className="deck-btn deck-loop-btn" onClick={handleLoopIn} disabled={!track}>IN</button>
               <button className="deck-btn deck-loop-btn" onClick={handleLoopOut} disabled={!track || loop.start == null}>OUT</button>
@@ -155,7 +167,8 @@ const Deck = forwardRef(({
               step="0.001"
               value={playbackRate}
               onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-              disabled={!track}
+              disabled={!track || syncEnabled}
+              title={syncEnabled ? 'Pitch is locked while SYNC is on' : undefined}
             />
             <span className="deck-pitch-value">{playbackRate >= 1 ? '+' : ''}{Math.round((playbackRate - 1) * 100)}%</span>
           </div>

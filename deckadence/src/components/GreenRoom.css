@@ -543,6 +543,12 @@
   border-color: #4ecdc4;
 }
 
+.deck-sync-btn.active {
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  border-color: transparent;
+  color: #fff;
+}
+
 .deck-pitch-control {
   display: flex;
   align-items: center;
