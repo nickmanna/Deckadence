@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import Waveform from './Waveform';
 import { useDeckPlayer } from '../hooks/useDeckPlayer';
 
@@ -10,8 +10,13 @@ import { useDeckPlayer } from '../hooks/useDeckPlayer';
  * crossfader position, from the parent mixer) rather than deck-owned
  * state, since the mixer needs to be the source of truth for gain across
  * all decks at once.
+ *
+ * Transport handlers are also exposed imperatively via `ref` (see
+ * useImperativeHandle below) so Green Room can wire one shared DDJ-FLX4
+ * controller instance to whichever channel is mapped to its left/right
+ * physical deck, without this component needing to know MIDI exists.
  */
-const Deck = ({ deckNumber, track, volume, zoomLevel, onDragOver, onDragLeave, onDrop }) => {
+const Deck = forwardRef(({ deckNumber, track, volume, zoomLevel, onDragOver, onDragLeave, onDrop }, ref) => {
   const {
     audioRef,
     isPlaying, togglePlay,
@@ -22,6 +27,17 @@ const Deck = ({ deckNumber, track, volume, zoomLevel, onDragOver, onDragLeave, o
     handleCuePress, handleCueRelease,
     handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight,
   } = useDeckPlayer(track, { externalVolume: volume });
+
+  useImperativeHandle(ref, () => ({
+    togglePlay,
+    handleCuePress,
+    handleCueRelease,
+    handleLoopIn,
+    handleLoopOut,
+    handleLoop4BeatOrExit,
+    handleLoopCallLeft,
+    handleLoopCallRight,
+  }), [togglePlay, handleCuePress, handleCueRelease, handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight]);
 
   return (
     <div className="deck">
@@ -109,6 +125,8 @@ const Deck = ({ deckNumber, track, volume, zoomLevel, onDragOver, onDragLeave, o
       <audio ref={audioRef} preload="auto" />
     </div>
   );
-};
+});
+
+Deck.displayName = 'Deck';
 
 export default Deck;

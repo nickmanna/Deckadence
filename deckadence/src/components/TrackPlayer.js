@@ -23,15 +23,19 @@ const TrackPlayer = ({ track, onClose }) => {
     handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight,
   } = useDeckPlayer(track);
 
+  // Only one virtual deck here, so only the left physical deck (MIDI
+  // channel 0 / decoded deck 1) is wired up - the right deck is ignored.
   const midiStatus = useDdjFlx4Controller({
-    onPlayPause: togglePlay,
-    onCuePress: handleCuePress,
-    onCueRelease: handleCueRelease,
-    onLoopIn: handleLoopIn,
-    onLoopOut: handleLoopOut,
-    onLoop4BeatOrExit: handleLoop4BeatOrExit,
-    onLoopCallLeft: handleLoopCallLeft,
-    onLoopCallRight: handleLoopCallRight,
+    1: {
+      onPlayPause: togglePlay,
+      onCuePress: handleCuePress,
+      onCueRelease: handleCueRelease,
+      onLoopIn: handleLoopIn,
+      onLoopOut: handleLoopOut,
+      onLoop4BeatOrExit: handleLoop4BeatOrExit,
+      onLoopCallLeft: handleLoopCallLeft,
+      onLoopCallRight: handleLoopCallRight,
+    },
   });
 
   const handleVolumeChange = (e) => {

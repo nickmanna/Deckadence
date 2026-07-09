@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { TrackService } from '../services/trackService';
+import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
 import Deck from './Deck';
 import './GreenRoom.css';
 
@@ -52,6 +53,30 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
 
   const getEffectiveVolume = (channelId, faderIndex) =>
     channelFaders[faderIndex] * crossfaderMultiplier(crossfader, CROSSFADER_GROUP[channelId]);
+
+  // DDJ-FLX4 wiring: the hardware only has 2 physical decks (left/right),
+  // which map onto Green Room channels 1 and 2 - the same pair CROSSFADER_
+  // GROUP already treats as sides A/B, and the only two channels visible in
+  // 2-channel mode. Channels 3/4 (4-channel mode) have no physical deck to
+  // receive MIDI from. Deck's transport handlers are read via ref (see
+  // Deck.js's useImperativeHandle) rather than lifting useDeckPlayer's
+  // state up into GreenRoom, so each Deck keeps owning its own playback
+  // state exactly as it does today.
+  const deckRefs = useRef({});
+  const midiHandlersForDeck = (deckId) => ({
+    onPlayPause: () => deckRefs.current[deckId]?.togglePlay(),
+    onCuePress: () => deckRefs.current[deckId]?.handleCuePress(),
+    onCueRelease: () => deckRefs.current[deckId]?.handleCueRelease(),
+    onLoopIn: () => deckRefs.current[deckId]?.handleLoopIn(),
+    onLoopOut: () => deckRefs.current[deckId]?.handleLoopOut(),
+    onLoop4BeatOrExit: () => deckRefs.current[deckId]?.handleLoop4BeatOrExit(),
+    onLoopCallLeft: () => deckRefs.current[deckId]?.handleLoopCallLeft(),
+    onLoopCallRight: () => deckRefs.current[deckId]?.handleLoopCallRight(),
+  });
+  const midiStatus = useDdjFlx4Controller({
+    1: midiHandlersForDeck(1),
+    2: midiHandlersForDeck(2),
+  });
 
   // Track list resizing state
   const [isResizing, setIsResizing] = useState(false);
@@ -464,6 +489,28 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
           </div>
         </div>
 
+        <div className="green-room-midi">
+          {midiStatus.connected ? (
+            <span
+              className="green-room-midi-status connected"
+              title={midiStatus.deviceNames.join(', ')}
+            >
+              🎛️ MIDI: L/R decks
+            </span>
+          ) : (
+            <>
+              <span className="green-room-midi-status">
+                {midiStatus.supported ? 'No MIDI controller' : 'MIDI unsupported'}
+              </span>
+              {midiStatus.supported && (
+                <button className="green-room-midi-connect-btn" onClick={midiStatus.connect}>
+                  Connect MIDI
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
         <div className="channel-count-toggle">
           <button
             className={`channel-count-btn ${channelCount === 2 ? 'active' : ''}`}
@@ -484,6 +531,7 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
         {channels.slice(0, channelCount).map((channel, index) => (
           <Deck
             key={channel.id}
+            ref={(el) => { deckRefs.current[channel.id] = el; }}
             deckNumber={channel.id}
             track={channel.track}
             volume={getEffectiveVolume(channel.id, index)}

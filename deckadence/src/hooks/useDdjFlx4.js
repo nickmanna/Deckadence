@@ -46,9 +46,13 @@ export function decodeDdjFlx4Message(data) {
 const toHex = (data) => Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ');
 
 /**
- * Connects to a DDJ-FLX4 (or any Web MIDI input) and routes Deck 1's PLAY,
- * CUE and loop buttons to the given handlers. Deck 2 is ignored for now
- * since the track library preview only has one deck to control.
+ * Connects to a DDJ-FLX4 (or any Web MIDI input) and routes each physical
+ * deck's PLAY, CUE and loop buttons to the handlers registered for that
+ * deck. `handlers` is keyed by deck number - 1 for the left deck (MIDI
+ * channel 0), 2 for the right deck (channel 1), per decodeDdjFlx4Message
+ * above - e.g. `{ 1: { onPlayPause, ... }, 2: { onPlayPause, ... } }`.
+ * A deck with no entry in the map is simply ignored, so a single-deck
+ * caller (the track library preview) can pass just `{ 1: {...} }`.
  *
  * Listens on EVERY currently available MIDI input, not just a single
  * best-guess pick - some controllers/OS combinations expose more than one
@@ -85,9 +89,10 @@ export function useDdjFlx4Controller(handlers) {
     setStatus((s) => ({ ...s, lastMessage: { hex: toHex(event.data), at: Date.now() } }));
 
     const decoded = decodeDdjFlx4Message(event.data);
-    if (!decoded || decoded.deck !== 1) return;
+    if (!decoded) return;
 
-    const h = handlersRef.current || {};
+    const h = (handlersRef.current || {})[decoded.deck];
+    if (!h) return;
     switch (decoded.control) {
       case 'play':
         if (decoded.pressed) h.onPlayPause?.();
