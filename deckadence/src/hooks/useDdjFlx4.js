@@ -14,6 +14,16 @@ const NOTE_TO_CONTROL = {
   83: 'loopCallRight',
 };
 
+// The three linear faders (Group 3. MIXER in the same MIDI message list),
+// each sent as Control Change. The hardware actually sends a 14-bit
+// MSB/LSB pair per fader (LSB CC = MSB CC + 32) for extra resolution, but
+// this app only reads the MSB - 128 steps is already finer than a mouse
+// drag on the equivalent on-screen slider, and every fader move sends the
+// MSB regardless.
+const CC_CHANNEL_FADER = 19; // per-deck volume fader - channel 0 (deck 1) / 1 (deck 2)
+const CC_TEMPO = 0;          // pitch/tempo fader - channel 0 (deck 1) / 1 (deck 2)
+const CC_CROSSFADER = 31;    // shared crossfader - channel 6, not tied to either deck
+
 /**
  * Decode a raw Web MIDI message from a DDJ-FLX4 into a semantic control
  * event, or null if it's a message this app doesn't handle yet.
@@ -26,20 +36,31 @@ const NOTE_TO_CONTROL = {
  */
 export function decodeDdjFlx4Message(data) {
   if (!data || data.length < 2) return null;
-  const [status, note, velocity = 0] = data;
+  const [status, data1, data2 = 0] = data;
   const statusType = status & 0xf0;
   const channel = status & 0x0f;
+
+  if (statusType === 0xb0) {
+    if (channel === 6 && data1 === CC_CROSSFADER) {
+      return { deck: null, control: 'crossfader', value: data2 };
+    }
+    if (channel !== 0 && channel !== 1) return null;
+    const deck = channel === 0 ? 1 : 2;
+    if (data1 === CC_CHANNEL_FADER) return { deck, control: 'channelFader', value: data2 };
+    if (data1 === CC_TEMPO) return { deck, control: 'tempo', value: data2 };
+    return null;
+  }
 
   if (statusType !== 0x90 && statusType !== 0x80) return null;
   if (channel !== 0 && channel !== 1) return null;
 
-  const control = NOTE_TO_CONTROL[note];
+  const control = NOTE_TO_CONTROL[data1];
   if (!control) return null;
 
   return {
     deck: channel === 0 ? 1 : 2,
     control,
-    pressed: statusType === 0x90 && velocity > 0,
+    pressed: statusType === 0x90 && data2 > 0,
   };
 }
 
@@ -47,12 +68,22 @@ const toHex = (data) => Array.from(data).map((b) => b.toString(16).padStart(2, '
 
 /**
  * Connects to a DDJ-FLX4 (or any Web MIDI input) and routes each physical
- * deck's PLAY, CUE and loop buttons to the handlers registered for that
- * deck. `handlers` is keyed by deck number - 1 for the left deck (MIDI
- * channel 0), 2 for the right deck (channel 1), per decodeDdjFlx4Message
- * above - e.g. `{ 1: { onPlayPause, ... }, 2: { onPlayPause, ... } }`.
+ * deck's PLAY, CUE, loop and fader controls to the handlers registered for
+ * that deck. `handlers` is keyed by deck number - 1 for the left deck
+ * (MIDI channel 0), 2 for the right deck (channel 1), per
+ * decodeDdjFlx4Message above - e.g.
+ * `{ 1: { onPlayPause, onChannelFaderChange, onTempoChange, ... }, 2: {...} }`.
  * A deck with no entry in the map is simply ignored, so a single-deck
  * caller (the track library preview) can pass just `{ 1: {...} }`.
+ *
+ * The crossfader isn't tied to either physical deck, so its handler is a
+ * top-level `onCrossfaderChange` rather than living under a deck key.
+ *
+ * `onChannelFaderChange` and `onCrossfaderChange` are called with a 0-1
+ * value (0 = fader at the bottom / hard left, 1 = top / hard right),
+ * matching this app's existing volume and crossfader state range.
+ * `onTempoChange` is also called with a 0-1 value - callers map that onto
+ * whatever playbackRate range their pitch slider uses (0.9-1.1 today).
  *
  * Listens on EVERY currently available MIDI input, not just a single
  * best-guess pick - some controllers/OS combinations expose more than one
@@ -91,6 +122,11 @@ export function useDdjFlx4Controller(handlers) {
     const decoded = decodeDdjFlx4Message(event.data);
     if (!decoded) return;
 
+    if (decoded.control === 'crossfader') {
+      handlersRef.current?.onCrossfaderChange?.(decoded.value / 127);
+      return;
+    }
+
     const h = (handlersRef.current || {})[decoded.deck];
     if (!h) return;
     switch (decoded.control) {
@@ -115,6 +151,12 @@ export function useDdjFlx4Controller(handlers) {
         break;
       case 'loopCallRight':
         if (decoded.pressed) h.onLoopCallRight?.();
+        break;
+      case 'channelFader':
+        h.onChannelFaderChange?.(decoded.value / 127);
+        break;
+      case 'tempo':
+        h.onTempoChange?.(decoded.value / 127);
         break;
       default:
         break;

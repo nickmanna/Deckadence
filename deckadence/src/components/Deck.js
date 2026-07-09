@@ -37,7 +37,8 @@ const Deck = forwardRef(({ deckNumber, track, volume, zoomLevel, onDragOver, onD
     handleLoop4BeatOrExit,
     handleLoopCallLeft,
     handleLoopCallRight,
-  }), [togglePlay, handleCuePress, handleCueRelease, handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight]);
+    setPlaybackRate,
+  }), [togglePlay, handleCuePress, handleCueRelease, handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight, setPlaybackRate]);
 
   return (
     <div className="deck">

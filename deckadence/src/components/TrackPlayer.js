@@ -25,6 +25,7 @@ const TrackPlayer = ({ track, onClose }) => {
 
   // Only one virtual deck here, so only the left physical deck (MIDI
   // channel 0 / decoded deck 1) is wired up - the right deck is ignored.
+  // No crossfader handler - this single-deck preview has no crossfader.
   const midiStatus = useDdjFlx4Controller({
     1: {
       onPlayPause: togglePlay,
@@ -35,6 +36,8 @@ const TrackPlayer = ({ track, onClose }) => {
       onLoop4BeatOrExit: handleLoop4BeatOrExit,
       onLoopCallLeft: handleLoopCallLeft,
       onLoopCallRight: handleLoopCallRight,
+      onChannelFaderChange: setVolume,
+      onTempoChange: (v) => setPlaybackRate(0.9 + v * 0.2),
     },
   });
 

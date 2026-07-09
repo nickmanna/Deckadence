@@ -63,6 +63,8 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
   // state up into GreenRoom, so each Deck keeps owning its own playback
   // state exactly as it does today.
   const deckRefs = useRef({});
+  // channelFaders is indexed by on-screen position, not channel id - but
+  // channels is never reordered, so index === deckId - 1 always holds.
   const midiHandlersForDeck = (deckId) => ({
     onPlayPause: () => deckRefs.current[deckId]?.togglePlay(),
     onCuePress: () => deckRefs.current[deckId]?.handleCuePress(),
@@ -72,10 +74,22 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
     onLoop4BeatOrExit: () => deckRefs.current[deckId]?.handleLoop4BeatOrExit(),
     onLoopCallLeft: () => deckRefs.current[deckId]?.handleLoopCallLeft(),
     onLoopCallRight: () => deckRefs.current[deckId]?.handleLoopCallRight(),
+    onChannelFaderChange: (v) => {
+      setChannelFaders((prev) => {
+        const next = [...prev];
+        next[deckId - 1] = v;
+        return next;
+      });
+    },
+    // Pitch/tempo is deck-owned state (useDeckPlayer), not mixer state, so
+    // it goes through the deck ref rather than GreenRoom's own setters -
+    // same 0.9-1.1 range as the on-screen pitch slider in Deck.js.
+    onTempoChange: (v) => deckRefs.current[deckId]?.setPlaybackRate(0.9 + v * 0.2),
   });
   const midiStatus = useDdjFlx4Controller({
     1: midiHandlersForDeck(1),
     2: midiHandlersForDeck(2),
+    onCrossfaderChange: setCrossfader,
   });
 
   // Track list resizing state
