@@ -214,15 +214,24 @@
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
-/* Waveform container styling */
-.waveform-container {
-  height: 50vh;
-  display: flex;
-  flex-direction: column;
+/* Console surface: a single CSS grid holding every deck's waveform (each
+   spanning the full width, stacked one per row) plus one control row
+   underneath laid out like the physical board - Deck.js places its two
+   halves (waveform row / controls block) into this grid via inline
+   grid-row/grid-column handed down from GreenRoom, despite both halves
+   coming from the same component instance (see Deck.js's Fragment
+   return). Bounded max-width + centered margins so this reads as a
+   physical console sitting in the middle of the page rather than
+   stretching edge-to-edge on a wide monitor. */
+.green-room-deck-surface {
+  display: grid;
   gap: 8px;
   padding: 8px;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .options-container,
@@ -230,28 +239,20 @@
   display: none;
 }
 
-/* Each deck (header + waveform + transport) shares the row equally;
-   height comes from flex, not a fixed cap, since a deck now needs room
-   for more than just the waveform strip. */
-.waveform-container > .deck {
-  flex: 1;
-  min-height: 0;
-}
-
 /* Override Waveform component heights in GreenRoom */
-.waveform-container .waveform-component {
+.green-room-deck-surface .waveform-component {
   height: 100% !important;
 }
 
-.waveform-container .waveform-container,
-.waveform-container .dj-waveform-container {
+.green-room-deck-surface .waveform-container,
+.green-room-deck-surface .dj-waveform-container {
   height: 100% !important;
   margin-bottom: 0 !important;
 }
 
-.waveform-container .waveform-canvas,
-.waveform-container .dj-waveform-canvas,
-.waveform-container .waveform-placeholder {
+.green-room-deck-surface .waveform-canvas,
+.green-room-deck-surface .dj-waveform-canvas,
+.green-room-deck-surface .waveform-placeholder {
   height: 100% !important;
   min-height: unset !important;
   max-height: unset !important;
@@ -332,16 +333,20 @@
   border-radius: 8px;
 }
 
-.deck {
+/* One deck's waveform half - stacked full-width, one row per deck, above
+   the shared control surface. */
+.deck-waveform-row {
   display: flex;
   flex-direction: column;
   background: #141414;
   border: 1px solid #2a2a2a;
   border-radius: 6px;
   overflow: hidden;
+  grid-column: 1 / -1;
+  min-height: 0;
 }
 
-.deck .waveform-drop-zone {
+.deck-waveform-row .waveform-drop-zone {
   flex: 1;
   min-height: 0;
 }
@@ -393,14 +398,97 @@
   flex-shrink: 0;
 }
 
-.deck-transport {
+/* One deck's control half - jog wheel on its outer edge (order flipped by
+   deck-controls-left/right below) plus the transport block. Sits in the
+   single control row underneath the stacked waveforms, grid-placed by
+   GreenRoom next to whichever side of the mixer this deck belongs to. */
+.deck-controls-block {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: #1c1c1c;
-  border-top: 1px solid #2a2a2a;
+  gap: 14px;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 10px 14px;
+  /* Flex items default to min-width:auto, which refuses to shrink below
+     the content's intrinsic width - with 4 decks' worth of these sharing
+     the row, that content is wider than the column, so it must be allowed
+     to shrink/wrap instead of overflowing into the next deck's block. */
+  min-width: 0;
+}
+
+.deck-controls-right {
+  flex-direction: row-reverse;
+}
+
+.deck-jog-wheel {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  min-width: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3a3a3a, #101010 70%);
+  border: 3px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+
+.deck-jog-marker {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 3px;
+  height: 10px;
+  background: #4ecdc4;
+  border-radius: 2px;
+  transform-origin: 50% 36px;
+  transform: translateX(-50%);
+}
+
+.deck-jog-wheel.spinning .deck-jog-marker {
+  animation: deck-jog-spin 2s linear infinite;
+}
+
+@keyframes deck-jog-spin {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
+}
+
+.deck-jog-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.deck-jog-bpm {
+  color: #eee;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-jog-bpm-label {
+  color: #666;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.deck-transport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.deck-transport-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .deck-btn {
@@ -440,6 +528,7 @@
 .deck-loop-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -458,7 +547,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
 }
 
 .deck-pitch-control label {
@@ -540,39 +628,39 @@
     text-align: left;
   }
   
-  .waveform-container {
+  .green-room-deck-surface {
     height: 25vh;
-  }
-  
-  .waveform-container > * {
-    height: calc((25vh - 40px) / 4) !important;
-    min-height: 40px !important;
-    max-height: 60px !important;
   }
 }
 
-.dj-controls {
+/* The mixer sits in the control row's center column, between the left-
+   group and right-group decks' own control blocks. Crossfader stacks
+   below the channel faders (matching the real board, where it's a
+   horizontal slider along the bottom edge of the mixer section) rather
+   than sitting beside them - side by side, N channel faders plus the
+   crossfader's own label+slider width added up to far more than this
+   column actually has, and centered flex content that's wider than its
+   container silently overflows both edges instead of shrinking. */
+.mixer-center {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 48px;
-  height: 25vh;
+  gap: 16px;
   background: #1a1a1a;
-  border-top: 1px solid #333;
-  border-bottom: 1px solid #333;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 50;
-  padding: 16px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 12px 16px;
   box-sizing: border-box;
+  min-width: 0;
 }
 
 .fader-container {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  height: 100%;
-  gap: 28px;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .fader-control {
@@ -619,6 +707,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .crossfader-label {

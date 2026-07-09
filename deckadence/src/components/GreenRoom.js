@@ -54,6 +54,33 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
   const getEffectiveVolume = (channelId, faderIndex) =>
     channelFaders[faderIndex] * crossfaderMultiplier(crossfader, CROSSFADER_GROUP[channelId]);
 
+  // Console-style grid layout: every waveform stacks in one full-width
+  // column (row per deck), and one row underneath holds the actual control
+  // surface, laid out like the physical board - crossfader side A's decks
+  // to the left of the mixer, side B's to the right, jog wheel on each
+  // deck's own outer edge. Column/row numbers are handed to Deck as inline
+  // grid-column/grid-row so its waveform half and controls half can land in
+  // different places despite being rendered by the same component (see
+  // Deck.js's Fragment return).
+  const visibleChannels = channels.slice(0, channelCount);
+  const leftChannels = visibleChannels.filter((c) => CROSSFADER_GROUP[c.id] === 'A');
+  const rightChannels = visibleChannels.filter((c) => CROSSFADER_GROUP[c.id] === 'B');
+  const mixerColumn = leftChannels.length + 1;
+  const controlsRow = visibleChannels.length + 1;
+  const controlsColumnFor = (channelId) => {
+    const leftIndex = leftChannels.findIndex((c) => c.id === channelId);
+    if (leftIndex !== -1) return leftIndex + 1;
+    const rightIndex = rightChannels.findIndex((c) => c.id === channelId);
+    return mixerColumn + 1 + rightIndex;
+  };
+  const deckSurfaceStyle = {
+    gridTemplateColumns:
+      `${leftChannels.map(() => 'minmax(260px, auto)').join(' ')} ` +
+      'minmax(240px, 1fr) ' +
+      `${rightChannels.map(() => 'minmax(260px, auto)').join(' ')}`,
+    gridTemplateRows: `${visibleChannels.map(() => '1fr').join(' ')} auto`,
+  };
+
   // DDJ-FLX4 wiring: the hardware only has 2 physical decks (left/right),
   // which map onto Green Room channels 1 and 2 - the same pair CROSSFADER_
   // GROUP already treats as sides A/B, and the only two channels visible in
@@ -541,8 +568,8 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
         </div>
       </div>
 
-      <div className="waveform-container">
-        {channels.slice(0, channelCount).map((channel, index) => (
+      <div className="green-room-deck-surface" style={deckSurfaceStyle}>
+        {visibleChannels.map((channel, index) => (
           <Deck
             key={channel.id}
             ref={(el) => { deckRefs.current[channel.id] = el; }}
@@ -550,56 +577,60 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
             track={channel.track}
             volume={getEffectiveVolume(channel.id, index)}
             zoomLevel={zoomLevel}
+            side={CROSSFADER_GROUP[channel.id] === 'A' ? 'left' : 'right'}
+            waveformRow={index + 1}
+            controlsRow={controlsRow}
+            controlsColumn={controlsColumnFor(channel.id)}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
           />
         ))}
-      </div>
 
-      {/* Mixer: per-channel volume fader plus a shared crossfader. EQ is
-          intentionally not here yet - it needs each deck's audio routed
-          through Web Audio filter nodes rather than the plain <audio>
-          element playback used today, which is a bigger follow-up. */}
-      <div className="dj-controls">
-        <div className="fader-container">
-          {channels.slice(0, channelCount).map((channel, index) => (
-            <div key={channel.id} className="fader-control">
-              <span className="fader-group-label">{CROSSFADER_GROUP[channel.id]}</span>
-              <div className="fader-track">
-                <input
-                  type="range"
-                  className="fader-slider-input"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={channelFaders[index]}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    setChannelFaders((prev) => {
-                      const next = [...prev];
-                      next[index] = value;
-                      return next;
-                    });
-                  }}
-                />
+        {/* Mixer: per-channel volume fader plus a shared crossfader. EQ is
+            intentionally not here yet - it needs each deck's audio routed
+            through Web Audio filter nodes rather than the plain <audio>
+            element playback used today, which is a bigger follow-up. */}
+        <div className="mixer-center" style={{ gridRow: controlsRow, gridColumn: mixerColumn }}>
+          <div className="fader-container">
+            {visibleChannels.map((channel, index) => (
+              <div key={channel.id} className="fader-control">
+                <span className="fader-group-label">{CROSSFADER_GROUP[channel.id]}</span>
+                <div className="fader-track">
+                  <input
+                    type="range"
+                    className="fader-slider-input"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={channelFaders[index]}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      setChannelFaders((prev) => {
+                        const next = [...prev];
+                        next[index] = value;
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+                <span className="fader-label">CH {channel.id}</span>
               </div>
-              <span className="fader-label">CH {channel.id}</span>
-            </div>
-          ))}
-        </div>
-        <div className="crossfader-container">
-          <span className="crossfader-label">A</span>
-          <input
-            type="range"
-            className="crossfader-slider"
-            min="0"
-            max="1"
-            step="0.01"
-            value={crossfader}
-            onChange={(e) => setCrossfader(parseFloat(e.target.value))}
-          />
-          <span className="crossfader-label">B</span>
+            ))}
+          </div>
+          <div className="crossfader-container">
+            <span className="crossfader-label">A</span>
+            <input
+              type="range"
+              className="crossfader-slider"
+              min="0"
+              max="1"
+              step="0.01"
+              value={crossfader}
+              onChange={(e) => setCrossfader(parseFloat(e.target.value))}
+            />
+            <span className="crossfader-label">B</span>
+          </div>
         </div>
       </div>
 
