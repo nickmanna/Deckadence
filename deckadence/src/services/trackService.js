@@ -19,6 +19,9 @@ import { db, storage } from '../firebase';
 const TRACKS_COLLECTION = 'tracks';
 const USERS_COLLECTION = 'users';
 
+// Resolved Storage download URLs, keyed by storagePath - see getAudioFile.
+const downloadUrlCache = new Map();
+
 export class TrackService {
   // Save a new track to Firestore
   static async saveTrack(trackData, userId) {
@@ -374,13 +377,22 @@ export class TrackService {
   static async getAudioFile(track) {
     try {
       let downloadURL;
-      
+
       if (track.downloadURL) {
         downloadURL = track.downloadURL;
       } else if (track.storagePath) {
-        // If we only have storage path, get the download URL first
-        const storageRef = ref(storage, track.storagePath);
-        downloadURL = await getDownloadURL(storageRef);
+        // getDownloadURL() is its own network round trip to Storage - the
+        // same track can get loaded repeatedly in one session (reopening
+        // the library, dragging it onto a different deck) without its
+        // storagePath ever changing, so resolve it once per session
+        // rather than ad hoc on every load.
+        if (downloadUrlCache.has(track.storagePath)) {
+          downloadURL = downloadUrlCache.get(track.storagePath);
+        } else {
+          const storageRef = ref(storage, track.storagePath);
+          downloadURL = await getDownloadURL(storageRef);
+          downloadUrlCache.set(track.storagePath, downloadURL);
+        }
       } else {
         throw new Error('No audio file reference found');
       }

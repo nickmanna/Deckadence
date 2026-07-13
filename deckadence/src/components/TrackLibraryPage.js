@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { TrackService } from '../services/trackService';
+import { useTrackCache } from '../contexts/TrackCacheContext';
 import WaveformThumbnail from './WaveformThumbnail';
 import TrackPlayer from './TrackPlayer';
 import './TrackLibraryPage.css';
@@ -74,37 +74,13 @@ const COLUMNS = [
 
 const TrackLibraryPage = () => {
   const { currentUser } = useAuth();
-  const [tracks, setTracks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { tracks, loading } = useTrackCache();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBPM, setFilterBPM] = useState('');
   const [filterKey, setFilterKey] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedTrack, setSelectedTrack] = useState(null);
-
-  useEffect(() => {
-    let ignore = false;
-
-    if (!currentUser) {
-      setTracks([]);
-      return;
-    }
-
-    setLoading(true);
-    TrackService.getUserTracks(currentUser.uid)
-      .then(result => {
-        if (!ignore) setTracks(result);
-      })
-      .catch(error => console.error('Error loading tracks from Firestore:', error))
-      .finally(() => {
-        if (!ignore) setLoading(false);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [currentUser]);
 
   const filteredTracks = useMemo(() => {
     let result = [...tracks];

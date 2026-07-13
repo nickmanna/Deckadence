@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { TrackService } from '../services/trackService';
+import { useTrackCache } from '../contexts/TrackCacheContext';
 import { FEATURES } from '../config/features';
 import './DiscoverPage.css';
 
@@ -14,26 +14,12 @@ const QUICK_LINKS = [
 
 const DiscoverPage = () => {
   const { currentUser } = useAuth();
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    let ignore = false;
-
-    if (!currentUser) {
-      setStats(null);
-      return;
-    }
-
-    TrackService.getUserStats(currentUser.uid)
-      .then(result => {
-        if (!ignore) setStats(result);
-      })
-      .catch(error => console.error('Error loading stats:', error));
-
-    return () => {
-      ignore = true;
-    };
-  }, [currentUser]);
+  // Stats are derived from the same cached track list Library/Green Room
+  // already read - no dedicated fetch needed here anymore (see
+  // TrackCacheContext). `loading` gates the stats block exactly like the
+  // old dedicated-fetch version did, so it doesn't flash "0 tracks" while
+  // the very first load of a session is still in flight.
+  const { stats, loading } = useTrackCache();
 
   return (
     <div className="discover-page">
@@ -43,7 +29,7 @@ const DiscoverPage = () => {
         </h1>
         <p className="discover-subtitle">The first step in learning to DJ</p>
 
-        {currentUser && stats && (
+        {currentUser && !loading && (
           <div className="discover-stats">
             <div className="discover-stat">
               <span className="discover-stat-value">{stats.totalTracks}</span>

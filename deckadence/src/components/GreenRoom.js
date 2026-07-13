@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { TrackService } from '../services/trackService';
+import { useTrackCache } from '../contexts/TrackCacheContext';
 import { useDdjFlx4Controller } from '../hooks/useDdjFlx4';
 import Deck from './Deck';
 import './GreenRoom.css';
-
-// A stable reference for the "no tracks prop passed" default - `tracks =
-// []` inline would create a brand new array on every render (function
-// components re-evaluate their default params every call), which fed
-// straight into the tracks-loading effect's dependency array below and
-// caused an infinite render loop the instant this page was reachable
-// (previously masked entirely, since the greenRoom feature flag always
-// rendered ComingSoon instead of this component).
-const EMPTY_TRACKS = [];
 
 // Which side of the crossfader each channel responds to - odd/even split
 // (1&3 vs 2&4) matches how a real club mixer's channel assign switches are
@@ -30,7 +20,7 @@ const crossfaderMultiplier = (position, group) => {
   return 1;
 };
 
-const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
+const GreenRoom = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const dropdownRefs = useRef({});
   const navigate = useNavigate();
@@ -41,10 +31,9 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
     { id: 4, name: 'Channel 4', track: null }
   ]);
   const [zoomLevel, setZoomLevel] = useState(32.0);
-  const { currentUser } = useAuth();
-  const [userStats, setUserStats] = useState(null);
-  const [filteredTracks, setFilteredTracks] = useState(tracks);
-  const [loading, setLoading] = useState(false);
+  // Shared with DiscoverPage/TrackLibraryPage - loaded once on login rather
+  // than by whichever page happens to mount (see TrackCacheContext).
+  const { tracks: filteredTracks, loading } = useTrackCache();
 
   // 2-deck vs 4-deck layout, and the mixer state driving each deck's gain.
   const [channelCount, setChannelCount] = useState(2);
@@ -226,61 +215,6 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', handleResizeEnd);
   };
-
-  useEffect(() => {
-    console.log('GreenRoom useEffect - tracks:', tracks);
-    console.log('GreenRoom useEffect - currentUser:', currentUser);
-    
-    if (tracks.length > 0) {
-      console.log('Using passed tracks:', tracks);
-      setFilteredTracks(tracks);
-      return;
-    }
-    if (currentUser) {
-      const loadTracksFromFirestore = async () => {
-        if (!currentUser) return;
-        
-        setLoading(true);
-        try {
-          const firestoreTracks = await TrackService.getUserTracks(currentUser.uid);
-          console.log('Firestore tracks loaded:', firestoreTracks);
-          setFilteredTracks(firestoreTracks);
-          // Load user stats
-          const stats = await TrackService.getUserStats(currentUser.uid);
-          setUserStats(stats);
-        } catch (error) {
-          console.error('Error loading tracks from Firestore:', error);
-          // Add mock data for testing
-          const mockTracks = [
-            {
-              trackID: 'mock1',
-              fileName: 'Test Track 1',
-              duration: 180,
-              bpm: 128,
-              key: 'Am',
-              previewUrl: null
-            },
-            {
-              trackID: 'mock2',
-              fileName: 'Test Track 2',
-              duration: 240,
-              bpm: 135,
-              key: 'C#m',
-              previewUrl: null
-            }
-          ];
-          setFilteredTracks(mockTracks);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      loadTracksFromFirestore();
-    } else {
-      console.log('No currentUser, setting empty tracks');
-      setFilteredTracks([]);
-    }
-  }, [currentUser, tracks]);
 
   const formatDuration = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -666,26 +600,26 @@ const GreenRoom = ({ tracks = EMPTY_TRACKS }) => {
         >
         </div>
         <div className="track-list-content">
-          {console.log('Rendering tracks:', filteredTracks)}
-          {filteredTracks.length > 0 ? (
-            filteredTracks.map((track) => {
-              console.log('Rendering track item:', track);
-              return (
-                <div
-                  key={track.trackID || track.id}
-                  className="list-item"
-                  onClick={() => handleTrackClick(track)}
-                  draggable="true"
-                  onDragStart={(e) => handleDragStart(e, track)}
-                >
-                  <img src={track.previewUrl} alt={track.fileName} className="list-item-image" />
-                  <div className="track-title">{track.fileName || track.title || 'Unknown Track'}</div>
-                  <div className="track-duration">{formatDuration(track.duration || 0)}</div>
-                  <div className="track-bpm">{track.bpm || 0} BPM</div>
-                  <div className="track-key">{track.key || 'N/A'}</div>
-                </div>
-              );
-            })
+          {loading ? (
+            <div style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+              Loading tracks...
+            </div>
+          ) : filteredTracks.length > 0 ? (
+            filteredTracks.map((track) => (
+              <div
+                key={track.trackID || track.id}
+                className="list-item"
+                onClick={() => handleTrackClick(track)}
+                draggable="true"
+                onDragStart={(e) => handleDragStart(e, track)}
+              >
+                <img src={track.previewUrl} alt={track.fileName} className="list-item-image" />
+                <div className="track-title">{track.fileName || track.title || 'Unknown Track'}</div>
+                <div className="track-duration">{formatDuration(track.duration || 0)}</div>
+                <div className="track-bpm">{track.bpm || 0} BPM</div>
+                <div className="track-key">{track.key || 'N/A'}</div>
+              </div>
+            ))
           ) : (
             <div style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
               No tracks found

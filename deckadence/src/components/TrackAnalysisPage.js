@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTrackCache } from '../contexts/TrackCacheContext';
 import { TrackService } from '../services/trackService';
 import './TrackAnalysisPage.css';
 
@@ -17,6 +18,7 @@ const TrackAnalysisPage = () => {
   const [savedTrack, setSavedTrack] = useState(null);
   const fileInputRef = useRef(null);
   const { currentUser } = useAuth();
+  const { addTrack } = useTrackCache();
 
   const supportedFormats = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'];
 
@@ -264,8 +266,12 @@ const TrackAnalysisPage = () => {
       // Remove the File object as it can't be serialized
       delete cleanTrackData.file;
 
-      // Save track to Firestore
+      // Save track to Firestore, then push it straight into the shared
+      // track cache so it shows up in Library/Green Room immediately
+      // instead of waiting for whichever page reads the cache next to
+      // trigger its own refetch.
       const saved = await TrackService.saveTrack(cleanTrackData, currentUser.uid);
+      addTrack(saved);
       setSavedTrack(saved);
     } catch (error) {
       console.error('Error saving track:', error);

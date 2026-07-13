@@ -1,6 +1,6 @@
 # Deckadence
 
-## Implementation Guide — v1.0
+## Implementation Guide — v1.1
 
 **Status:** In Progress
 **Owner:** Nick Manna
@@ -60,6 +60,11 @@ endpoints, but the frontend does not use them — `TrackService`
 document straight to Firestore from the client after calling
 `/api/analyze`. Anything in that in-memory store is lost on every Cloud Run
 cold start and isn't part of the real data path (see [8. Known Gaps](#8-known-gaps--tech-debt)).
+
+The user's track list is fetched from Firestore **once per session** (via
+`TrackCacheContext`, see [5.6](#56-track--audio-caching)) rather than by
+each page independently — Discover/Library/Green Room all read the same
+in-memory cache instead of each firing its own Firestore query on mount.
 
 Every deck in Green Room owns its own playback state independently (its own
 `<audio>` element, its own loop/cue/pitch/sync state via `useDeckPlayer`) —
@@ -225,6 +230,39 @@ Only 2 physical decks exist on the hardware, mapped to Green Room channels 1
 and 2 regardless of 2CH/4CH mode — channels 3/4 have no physical deck to
 receive MIDI from.
 
+### 5.6 Track & Audio Caching
+
+`deckadence/src/contexts/TrackCacheContext.js` — a single in-memory cache
+of the signed-in user's track list, shared by Discover, Track Library, and
+Green Room via `useTrackCache()`.
+
+- **Loaded once per session**, right when a user becomes available
+  (`currentUser` changing in `AuthContext`), not ad hoc by whichever page
+  happens to mount — before this existed, Discover (`getUserStats`),
+  Library (`getUserTracks`), and Green Room (`getUserTracks` +
+  `getUserStats`) each ran their own independent Firestore fetch on every
+  mount, so navigating between them re-fetched the same data repeatedly.
+- **Stats are derived locally** (`computeStats`) from the same cached
+  array instead of a second Firestore round trip — `getUserStats` on
+  `TrackService` still exists but nothing calls it anymore.
+- **Optimistic insert on save** — `TrackAnalysisPage`'s save flow calls
+  `addTrack()` after `TrackService.saveTrack` succeeds, so a newly saved
+  track appears in Library/Green Room immediately rather than waiting on
+  the next full refetch.
+- **`refresh()`/`patchTrack()`** are exposed for cases that do need to
+  invalidate or update one cached entry, but nothing calls them yet.
+
+Separately, `TrackService.getAudioFile` (the fallback audio-loading path
+used when a track has a `storagePath` but no persisted `downloadURL`)
+caches each resolved Storage download URL in a module-level `Map` keyed by
+`storagePath`, so `getDownloadURL()` — itself a network round trip — only
+runs once per track per session instead of on every load. Tracks saved
+through the normal upload flow already have `downloadURL` persisted on the
+Firestore document (see 5.2), so this fallback path is mostly a safety net
+for legacy/edge-case tracks; the common case skips straight to
+`audio.src = track.downloadURL` and lets the browser stream/cache it
+natively.
+
 ## 6. Security Model
 
 | Control | Implementation |
@@ -270,6 +308,11 @@ still needs a human decision (API key rotation, CORS scoping, App Check).
   truth for track data.
 - No shared master clock across Green Room decks — beat sync (5.4) is a
   best-effort tempo/phase match, not sample-accurate lockstep playback.
+- `TrackCacheContext` (5.6) is in-memory only and scoped to one browser
+  session — a track edited/liked/deleted in another tab or device won't
+  show up here until the tab reloads (nothing currently mutates a track
+  after save, so this isn't yet a real inconsistency, just a limitation to
+  keep in mind once something does).
 
 ## 9. Troubleshooting
 
@@ -303,4 +346,5 @@ still needs a human decision (API key rotation, CORS scoping, App Check).
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.1 | 2026-07-09 | Nick Manna | Added `TrackCacheContext` (5.6) — track list + derived stats now load once per session and are shared across Discover/Library/Green Room instead of each page re-fetching from Firestore on mount; `TrackService.getAudioFile` now caches resolved GCS download URLs per session too. |
 | 1.0 | 2026-07-09 | Nick Manna | Initial implementation guide — captures track analysis pipeline, Green Room virtual mixer, beat sync, and DDJ-FLX4 MIDI support as of this date. |
