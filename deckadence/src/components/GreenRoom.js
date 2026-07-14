@@ -40,6 +40,24 @@ const GreenRoom = () => {
   const [channelFaders, setChannelFaders] = useState([0.8, 0.8, 0.8, 0.8]);
   const [crossfader, setCrossfader] = useState(0.5);
 
+  // Manually-designated sync master, if any - null means "no manual
+  // master, fall back to whichever other deck is currently playing" (see
+  // getSyncTargetForDeck below). Mixer-level state, same reasoning as
+  // channelFaders/crossfader: it's a relationship between decks, not
+  // something any one deck's own useDeckPlayer instance can own.
+  const [masterDeckId, setMasterDeckId] = useState(null);
+  const handleToggleMaster = (deckId) => {
+    setMasterDeckId((prev) => (prev === deckId ? null : deckId));
+  };
+
+  // A manually-set master that scrolled out of view (e.g. switching from
+  // 4CH down to 2CH) can't stay master - nothing would ever read it as a
+  // sync target again, so clear it back to auto mode instead of leaving a
+  // dangling reference.
+  useEffect(() => {
+    if (masterDeckId != null && masterDeckId > channelCount) setMasterDeckId(null);
+  }, [channelCount, masterDeckId]);
+
   const getEffectiveVolume = (channelId, faderIndex) =>
     channelFaders[faderIndex] * crossfaderMultiplier(crossfader, CROSSFADER_GROUP[channelId]);
 
@@ -80,16 +98,28 @@ const GreenRoom = () => {
   // state exactly as it does today.
   const deckRefs = useRef({});
 
-  // Beat sync target for a given deck: whichever *other* visible deck is
-  // currently playing, in on-screen channel order. There's no explicit
-  // "sync master" concept - with only 2-4 decks, "sync to whatever's
-  // already playing" covers the normal case (mix in a new track under
-  // whatever the crowd is already hearing) without needing extra UI to
-  // designate a master. Read via deckRefs (same imperative pattern as the
-  // MIDI handlers below) rather than lifting playback state into GreenRoom,
-  // so a syncing deck always sees the target's *live* state on every poll
-  // instead of a snapshot from whenever this function was created.
+  // Beat sync target for a given deck:
+  //  1. If a manual master is set (masterDeckId) and this isn't it, always
+  //     target the master - regardless of whether the master is currently
+  //     playing, since a manually-designated master is a deliberate,
+  //     explicit reference clock, not a "whatever's already going" guess.
+  //     The master deck itself has no target (it's the reference).
+  //  2. Otherwise, fall back to whichever *other* visible deck is
+  //     currently playing, in on-screen channel order - covers the normal
+  //     case (mix in a new track under whatever's already going) without
+  //     requiring anyone to explicitly designate a master first.
+  // Read via deckRefs (same imperative pattern as the MIDI handlers below)
+  // rather than lifting playback state into GreenRoom, so a syncing deck
+  // always sees the target's *live* state on every poll instead of a
+  // snapshot from whenever this function was created.
   const getSyncTargetForDeck = (deckId) => () => {
+    if (deckId === masterDeckId) return null;
+
+    if (masterDeckId != null) {
+      const info = deckRefs.current[masterDeckId]?.getSyncInfo?.();
+      return info?.bpm ? info : null;
+    }
+
     for (const channel of visibleChannels) {
       if (channel.id === deckId) continue;
       const info = deckRefs.current[channel.id]?.getSyncInfo?.();
@@ -535,6 +565,8 @@ const GreenRoom = () => {
             controlsRow={controlsRow}
             controlsColumn={controlsColumnFor(channel.id)}
             getSyncTarget={getSyncTargetForDeck(channel.id)}
+            isMaster={channel.id === masterDeckId}
+            onToggleMaster={() => handleToggleMaster(channel.id)}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}

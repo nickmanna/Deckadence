@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
 import Waveform from './Waveform';
 import { useDeckPlayer } from '../hooks/useDeckPlayer';
 
@@ -29,7 +29,7 @@ const Deck = forwardRef(({
   deckNumber, track, volume, zoomLevel, side = 'left',
   waveformRow, controlsRow, controlsColumn,
   onDragOver, onDragLeave, onDrop,
-  getSyncTarget,
+  getSyncTarget, isMaster, onToggleMaster,
 }, ref) => {
   const {
     audioRef,
@@ -37,12 +37,20 @@ const Deck = forwardRef(({
     currentTime, duration,
     cuePoint, loop, quantize, setQuantize,
     playbackRate, setPlaybackRate,
-    syncEnabled, toggleSync,
+    syncEnabled, setSyncEnabled, toggleSync,
     handleJogStart, handleJogEnd, handleSeekToTime,
     handleCuePress, handleCueRelease,
     handleLoopIn, handleLoopOut, handleLoop4BeatOrExit, handleLoopCallLeft, handleLoopCallRight,
     getSyncInfo,
   } = useDeckPlayer(track, { externalVolume: volume, getSyncTarget });
+
+  // A deck that's the reference clock has nothing to sync to (GreenRoom's
+  // getSyncTargetForDeck already returns null for it), but leaving its own
+  // SYNC toggle showing "active" while it does nothing would be confusing -
+  // turn it off the moment this deck becomes master.
+  useEffect(() => {
+    if (isMaster && syncEnabled) setSyncEnabled(false);
+  }, [isMaster, syncEnabled, setSyncEnabled]);
 
   useImperativeHandle(ref, () => ({
     togglePlay,
@@ -136,10 +144,18 @@ const Deck = forwardRef(({
             <button
               className={`deck-btn deck-sync-btn ${syncEnabled ? 'active' : ''}`}
               onClick={toggleSync}
-              title="Match this deck's tempo and beat phase to whichever other deck is playing"
-              disabled={!track}
+              title="Match this deck's tempo and beat phase to the sync master (or whichever other deck is playing, if no master is set)"
+              disabled={!track || isMaster}
             >
               SYNC
+            </button>
+            <button
+              className={`deck-btn deck-master-btn ${isMaster ? 'active' : ''}`}
+              onClick={onToggleMaster}
+              title="Set this deck as the sync master - other synced decks match its tempo/phase regardless of whether it's playing"
+              disabled={!track}
+            >
+              M
             </button>
             <div className="deck-loop-controls">
               <button className="deck-btn deck-loop-btn" onClick={handleLoopIn} disabled={!track}>IN</button>

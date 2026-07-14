@@ -1,6 +1,6 @@
 # Deckadence
 
-## Implementation Guide — v1.2
+## Implementation Guide — v1.3
 
 **Status:** In Progress
 **Owner:** Nick Manna
@@ -199,9 +199,17 @@ channel renders a `Deck` (`Deck.js`), whose actual playback engine is
 
 Per-deck `SYNC` toggle (`Deck.js`, logic in `useDeckPlayer.js`).
 
-- **Target selection** — `GreenRoom.js`'s `getSyncTargetForDeck` picks
-  whichever *other* visible deck is currently playing (first match in
-  on-screen channel order). There is no explicit "master" concept yet.
+- **Target selection** — `GreenRoom.js`'s `getSyncTargetForDeck`:
+  1. If a manual master is set (`masterDeckId`, toggled via each deck's
+     `M` button — mutually exclusive, one master at a time), every other
+     deck targets it unconditionally, whether or not it's currently
+     playing. The master deck itself has no target (nothing to sync to).
+  2. Otherwise, falls back to whichever *other* visible deck is currently
+     playing (first match in on-screen channel order) — the pre-master-UI
+     behavior, still the default with nothing manually set.
+  A deck's own `SYNC` button is disabled while it *is* the master (and its
+  sync auto-disengages if it becomes master while already synced to
+  something else — see `Deck.js`'s `isMaster` effect).
 - **Tempo** — polled every 250ms while sync is on; this deck's
   `playbackRate` is set to `targetBPM / ownTrackBPM`, clamped to the same
   0.9-1.1 range as the manual pitch slider.
@@ -214,7 +222,8 @@ Per-deck `SYNC` toggle (`Deck.js`, logic in `useDeckPlayer.js`).
   `audio.play()` (gated on `audio.paused`, not a "was playing" ref), and
   runs *before* `.play()` — the deck starts already in phase rather than
   playing a frame from the old position and then jumping.
-- If no other deck is playing, SYNC arms but is a no-op until one is.
+- If no master is set and no other deck is playing, SYNC arms but is a
+  no-op until a target becomes available.
 - **Waveform display** — `Waveform.js`'s DJ view scales its visible time
   window by `playbackRate`, so two decks beat-synced to the same effective
   BPM show their beatgrids scrolling past the playhead at the same visual
@@ -348,8 +357,12 @@ still needs a human decision (API key rotation, CORS scoping, App Check).
   blaming the app.
 
 ### Beat sync doesn't seem to do anything
-- SYNC only has an effect once an *other* visible deck is actually playing —
-  it arms silently otherwise and starts correcting as soon as one is.
+- With no manual master set, SYNC only has an effect once an *other*
+  visible deck is actually playing — it arms silently otherwise and starts
+  correcting as soon as one is.
+- If a manual master (`M`) is set, confirm it's set on the deck you expect
+  — only one deck can be master at a time, and the master deck's own SYNC
+  button is disabled (it has nothing to sync to).
 - Confirm both decks' tracks have a detected `bpm` (an unanalyzed/mock track
   won't have one).
 
@@ -357,6 +370,7 @@ still needs a human decision (API key rotation, CORS scoping, App Check).
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.3 | 2026-07-09 | Nick Manna | Added a manual sync master: each deck gets an `M` toggle (`GreenRoom.js`'s `masterDeckId`, mutually exclusive) that other decks target unconditionally when set, overriding the "whichever other deck is playing" auto-fallback. A deck's own SYNC disables while it is the master. |
 | 1.2 | 2026-07-09 | Nick Manna | Fixed beat sync (5.4): `Waveform.js`'s DJ view now scales its visible time window by `playbackRate` (previously computed from each deck's own `duration` with no tempo term), so synced decks' beatgrids scroll at the same visual rate instead of drifting apart on screen despite matching audio. Also moved the paused→playing phase snap to run before `audio.play()` instead of after, gated on `audio.paused` rather than a separate "was playing" ref. |
 | 1.1 | 2026-07-09 | Nick Manna | Added `TrackCacheContext` (5.6) — track list + derived stats now load once per session and are shared across Discover/Library/Green Room instead of each page re-fetching from Firestore on mount; `TrackService.getAudioFile` now caches resolved GCS download URLs per session too. |
 | 1.0 | 2026-07-09 | Nick Manna | Initial implementation guide — captures track analysis pipeline, Green Room virtual mixer, beat sync, and DDJ-FLX4 MIDI support as of this date. |

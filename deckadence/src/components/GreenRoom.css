@@ -549,6 +549,16 @@
   color: #fff;
 }
 
+.deck-master-btn {
+  min-width: 24px;
+}
+
+.deck-master-btn.active {
+  background: #FF9500;
+  color: #0a0a0a;
+  border-color: #FF9500;
+}
+
 .deck-pitch-control {
   display: flex;
   align-items: center;

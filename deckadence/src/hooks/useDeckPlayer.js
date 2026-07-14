@@ -638,7 +638,7 @@ export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
     volume, setVolume: setVolumeState,
     cuePoint, loop, quantize, setQuantize,
     playbackRate, setPlaybackRate,
-    syncEnabled, toggleSync,
+    syncEnabled, setSyncEnabled, toggleSync,
     id3Data, albumCover,
     handleJogStart, handleJogEnd, handleSeekToTime,
     handleCuePress, handleCueRelease,
