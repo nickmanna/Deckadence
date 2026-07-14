@@ -100,6 +100,7 @@ const Deck = forwardRef(({
             duration={duration}
             viewMode="dj"
             zoomLevel={zoomLevel}
+            playbackRate={playbackRate}
             showWaveform
             showBeatgrid
             onSeekToTime={handleSeekToTime}

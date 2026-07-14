@@ -10,6 +10,13 @@ const MID_COLOR = [0x00, 0xE0, 0xB8];
 const HIGH_COLOR = [0xFF, 0x3D, 0x71];
 const DEFAULT_COLOR = 'rgb(78, 205, 196)';
 
+// Reference used to turn `zoomLevel` into a real-seconds-wide viewport
+// (see drawDJWaveform) - picked to land close to what the old
+// duration-coupled formula (duration/zoomLevel) used to show for a
+// typical ~4-minute track at the app's default zoomLevel of 32, so the
+// normal case doesn't suddenly look drastically more/less zoomed in.
+const ZOOM_REFERENCE_SECONDS = 240;
+
 const blendBandColor = (low, mid, high) => {
   const total = low + mid + high;
   if (total <= 0) return DEFAULT_COLOR;
@@ -37,7 +44,8 @@ const Waveform = ({
   onJogEnd,
   isPlaying = false,
   cuePoint = 0,
-  loop = { start: null, end: null }
+  loop = { start: null, end: null },
+  playbackRate = 1
 }) => {
   const canvasRef = useRef(null);
   const djCanvasRef = useRef(null);
@@ -189,7 +197,22 @@ const Waveform = ({
 
     if (!points || !duration) return;
 
-    const visibleDuration = duration / zoomLevel;
+    // Real seconds visible across the canvas width - deliberately NOT
+    // derived from this deck's own `duration` (the old `duration /
+    // zoomLevel` formula did that), since two tracks of different lengths
+    // would then show different amounts of real time at the "same"
+    // zoomLevel and their beatgrids could never scroll past the playhead
+    // at the same rate, no matter how well their tempos were matched.
+    // Scaling that fixed real-time window by playbackRate is what makes
+    // the waveform itself visually stretch/condense with tempo: faster
+    // playback (playbackRate > 1) packs more native-track content - more,
+    // closer-together beats - into the same real-time span, and slower
+    // playback spreads it out. Two decks beat-synced to the same
+    // effective BPM end up with the same real-seconds-per-pixel rate
+    // here, so their beatgrids move in lockstep on screen exactly as they
+    // do on the (already correctly synced) audio.
+    const visibleRealSeconds = ZOOM_REFERENCE_SECONDS / zoomLevel;
+    const visibleDuration = visibleRealSeconds * playbackRate;
     const timeToX = (t) => width / 2 + ((t - time) / visibleDuration) * width;
     const visibleStart = time - visibleDuration / 2;
     const visibleEnd = time + visibleDuration / 2;
@@ -228,7 +251,7 @@ const Waveform = ({
     ctx.moveTo(width / 2, 0);
     ctx.lineTo(width / 2, height);
     ctx.stroke();
-  }, [points, duration, zoomLevel, showWaveform, drawBeatgrid, drawCueAndLoop]);
+  }, [points, duration, zoomLevel, playbackRate, showWaveform, drawBeatgrid, drawCueAndLoop]);
 
   // Smoothly interpolate the DJ view's playhead between currentTime prop
   // updates (which only arrive on the audio element's own timeupdate
@@ -245,7 +268,11 @@ const Waveform = ({
     let raf;
     const loop = () => {
       if (viewMode === 'dj') {
-        const elapsed = isPlaying ? (performance.now() - lastWallClockRef.current) / 1000 : 0;
+        // currentTime is native-track-time, which advances `playbackRate`
+        // seconds per real second - without this factor the interpolated
+        // position would drift back toward a 1x assumption between prop
+        // updates, the same rate-blindness this whole fix is for.
+        const elapsed = isPlaying ? ((performance.now() - lastWallClockRef.current) / 1000) * playbackRate : 0;
         drawDJWaveform(lastCurrentTimeRef.current + elapsed);
       } else {
         drawTraditionalWaveform(currentTime);
@@ -254,7 +281,7 @@ const Waveform = ({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [viewMode, isPlaying, currentTime, drawDJWaveform, drawTraditionalWaveform]);
+  }, [viewMode, isPlaying, currentTime, playbackRate, drawDJWaveform, drawTraditionalWaveform]);
 
   const handleSeek = (e) => {
     if (!onSeekToTime || !duration) return;
@@ -276,7 +303,9 @@ const Waveform = ({
 
     const handleMouseMove = (e) => {
       const deltaX = e.clientX - dragRef.current.startX;
-      const visibleDuration = duration / zoomLevel;
+      // Same visible-window formula as drawDJWaveform, so a given drag
+      // distance covers the same span of track you can actually see.
+      const visibleDuration = (ZOOM_REFERENCE_SECONDS / zoomLevel) * playbackRate;
       const deltaTime = -(deltaX / 800) * visibleDuration;
       const newTime = Math.max(0, Math.min(duration, dragRef.current.startTime + deltaTime));
       onSeekToTime(newTime);
@@ -293,7 +322,7 @@ const Waveform = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, duration, zoomLevel, onSeekToTime, onJogEnd]);
+  }, [isDragging, duration, zoomLevel, playbackRate, onSeekToTime, onJogEnd]);
 
   return (
     <div className="waveform-component">

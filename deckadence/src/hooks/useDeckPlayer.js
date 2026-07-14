@@ -122,6 +122,14 @@ export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
   const getSyncTargetRef = useRef(getSyncTarget);
   getSyncTargetRef.current = getSyncTarget;
 
+  // Forward reference to applySyncPhase (defined further down, after
+  // getPlaybackTime/getBeatgrid exist) - the playback effect below needs
+  // to call it *before* audio.play() runs, so the deck starts already in
+  // phase instead of playing from the old position for a frame and then
+  // jumping. Assigned during render, same idiom as getSyncTargetRef, so
+  // it's never stale by the time an effect reads it.
+  const applySyncPhaseRef = useRef(null);
+
   const handleJogStart = useCallback(() => {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
@@ -313,6 +321,14 @@ export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
     }
 
     if (isPlaying && audio.paused) {
+      // Snap phase to the sync target *before* play() rather than after -
+      // starting already-aligned instead of playing a frame from the old
+      // position and then jumping. `audio.paused` (not a "was playing"
+      // ref) is what gates this, so it fires on every genuine
+      // paused-to-playing transition regardless of which dependency
+      // (isPlaying, or e.g. playbackRate ticking from the sync-follow
+      // interval) caused this effect to re-run.
+      if (syncEnabled) applySyncPhaseRef.current?.();
       audio.play().catch(console.error);
     } else if (!isPlaying && !audio.paused) {
       audio.pause();
@@ -432,6 +448,7 @@ export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
     setCurrentTime(newTime);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getBeatgrid, getPlaybackTime, duration]);
+  applySyncPhaseRef.current = applySyncPhase;
 
   const toggleSync = useCallback(() => {
     setSyncEnabled((prev) => {
@@ -452,15 +469,6 @@ export function useDeckPlayer(track, { externalVolume, getSyncTarget } = {}) {
     return () => clearInterval(id);
   }, [syncEnabled, applySyncTempo]);
 
-  // Re-snap phase whenever this deck (re)starts playing while sync is
-  // engaged - e.g. it was cued up while armed, or paused mid-track and
-  // resumed - so it lands back in phase instead of just carrying forward
-  // whatever offset it drifted to while stopped.
-  const wasPlayingRef = useRef(isPlaying);
-  useEffect(() => {
-    if (syncEnabled && isPlaying && !wasPlayingRef.current) applySyncPhase();
-    wasPlayingRef.current = isPlaying;
-  }, [isPlaying, syncEnabled, applySyncPhase]);
 
   // Manual loop/cue points landing a few ms off the real beat is exactly
   // what makes hand-set loops sound "off" on every repeat - snapping to

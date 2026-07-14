@@ -1,6 +1,6 @@
 # Deckadence
 
-## Implementation Guide — v1.1
+## Implementation Guide — v1.2
 
 **Status:** In Progress
 **Owner:** Nick Manna
@@ -205,13 +205,24 @@ Per-deck `SYNC` toggle (`Deck.js`, logic in `useDeckPlayer.js`).
 - **Tempo** — polled every 250ms while sync is on; this deck's
   `playbackRate` is set to `targetBPM / ownTrackBPM`, clamped to the same
   0.9-1.1 range as the manual pitch slider.
-- **Phase** — snapped once, at the moment sync is engaged and again each
-  time this deck transitions from paused to playing while synced (not
+- **Phase** — snapped once, at the moment sync is engaged and again every
+  time this deck goes from paused to playing while synced (not
   continuously — continuous phase correction would be audibly perceptible
   as pitch wobble). Uses each deck's real detected beatgrid via
   `findNearestBeatIndex` (`beatQuantize.js`), not an assumed constant
-  interval.
+  interval. The paused→playing snap runs inside the same effect that calls
+  `audio.play()` (gated on `audio.paused`, not a "was playing" ref), and
+  runs *before* `.play()` — the deck starts already in phase rather than
+  playing a frame from the old position and then jumping.
 - If no other deck is playing, SYNC arms but is a no-op until one is.
+- **Waveform display** — `Waveform.js`'s DJ view scales its visible time
+  window by `playbackRate`, so two decks beat-synced to the same effective
+  BPM show their beatgrids scrolling past the playhead at the same visual
+  rate, matching the audio. Before this, the view's zoom was computed from
+  each deck's own `duration` with no `playbackRate` term at all, so two
+  tracks of different lengths and/or different pitch adjustments could be
+  correctly beatmatched in audio while still looking visually out of step
+  (see `ZOOM_REFERENCE_SECONDS` in `Waveform.js`).
 
 ### 5.5 DDJ-FLX4 MIDI Controller
 
@@ -346,5 +357,6 @@ still needs a human decision (API key rotation, CORS scoping, App Check).
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.2 | 2026-07-09 | Nick Manna | Fixed beat sync (5.4): `Waveform.js`'s DJ view now scales its visible time window by `playbackRate` (previously computed from each deck's own `duration` with no tempo term), so synced decks' beatgrids scroll at the same visual rate instead of drifting apart on screen despite matching audio. Also moved the paused→playing phase snap to run before `audio.play()` instead of after, gated on `audio.paused` rather than a separate "was playing" ref. |
 | 1.1 | 2026-07-09 | Nick Manna | Added `TrackCacheContext` (5.6) — track list + derived stats now load once per session and are shared across Discover/Library/Green Room instead of each page re-fetching from Firestore on mount; `TrackService.getAudioFile` now caches resolved GCS download URLs per session too. |
 | 1.0 | 2026-07-09 | Nick Manna | Initial implementation guide — captures track analysis pipeline, Green Room virtual mixer, beat sync, and DDJ-FLX4 MIDI support as of this date. |

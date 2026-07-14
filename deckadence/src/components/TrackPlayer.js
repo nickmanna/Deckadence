@@ -166,6 +166,7 @@ const TrackPlayer = ({ track, onClose }) => {
             duration={duration}
             viewMode={viewMode}
             zoomLevel={zoomLevel}
+            playbackRate={playbackRate}
             showWaveform={showWaveform}
             showBeatgrid={showBeatgrid}
             onSeekToTime={handleSeekToTime}
